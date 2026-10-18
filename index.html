@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preditor de degradação de rede</title>
+<meta name="description" content="Árvore de Decisão, Random Forest e XGBoost explicados e comparados na previsão do estado de caminhos da internet 12 minutos à frente, com dados públicos do RIPE Atlas e a persistência como régua.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* Paleta: Cotton #EDEBDD · Cherry Red #810100 · Maroon #630000 · Noir Black #1B1717 */
+  :root {
+    --cotton: #edebdd;
+    --cherry: #810100;
+    --maroon: #630000;
+    --noir: #1b1717;
+
+    --bg: var(--cotton);
+    --surface: #f6f4ea;
+    --text: var(--noir);
+    --muted: #5e5552;
+    --border: #d8d3c2;
+    --accent: var(--cherry);
+    --accent-soft: #f2e1d9;
+    --good: var(--cherry);
+    --code-bg: #e4e1d1;
+    --tree: var(--cherry);
+    --forest: #8a6a3a;
+    --boost: #4a3f3d;
+    --img-bg: #ffffff;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: var(--noir);
+      --surface: #241e1e;
+      --text: var(--cotton);
+      --muted: #b3aba0;
+      --border: #3a3131;
+      --accent: #e8a39b;
+      --accent-soft: #2e1a19;
+      --good: #e8a39b;
+      --code-bg: #2a2323;
+      --tree: #e8a39b;
+      --forest: #d6b98a;
+      --boost: #cfc9bd;
+      --img-bg: var(--cotton);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: var(--noir); --surface: #241e1e; --text: var(--cotton); --muted: #b3aba0;
+    --border: #3a3131; --accent: #e8a39b; --accent-soft: #2e1a19; --good: #e8a39b;
+    --code-bg: #2a2323; --tree: #e8a39b; --forest: #d6b98a; --boost: #cfc9bd;
+    --img-bg: var(--cotton); color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 64px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.7 "Source Serif 4", Georgia, "Times New Roman", serif;
+    overflow-x: clip;
+  }
+  h1, h2, h3, .kicker, table, figcaption, .stats, nav, footer, .site-header, .meta, .author, details summary, .refs {
+    font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  ::selection { background: var(--cherry); color: var(--cotton); }
+
+  .site-header { position: sticky; top: 0; z-index: 10; background: var(--noir); border-bottom: 3px solid var(--cherry); }
+  .site-header .inner { max-width: 1080px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 52px; }
+  .site-header .brand { font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--cotton); text-decoration: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+  .site-header .brand::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--cherry); box-shadow: 0 0 0 2px var(--cotton); }
+  .site-header nav { display: flex; gap: 18px; overflow-x: auto; font-size: 14px; scrollbar-width: none; }
+  .site-header nav::-webkit-scrollbar { display: none; }
+  .site-header nav a { color: #c9c3b5; text-decoration: none; white-space: nowrap; }
+  .site-header nav a:hover { color: var(--cotton); text-decoration: underline; text-decoration-color: var(--cherry); text-underline-offset: 6px; text-decoration-thickness: 2px; }
+
+  main { max-width: 760px; margin: 0 auto; padding: 0 16px 80px; }
+
+  .hero { margin: 0 calc(50% - 50vw) 32px; padding: 56px calc(50vw - 50% + 0px) 40px; background: var(--maroon); color: var(--cotton); position: relative; }
+  .hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--cherry); }
+  .hero .kicker { color: #f0b7ae; }
+  .hero .lede { color: #e6d9cf; }
+  .hero .meta { color: #e6d9cf; }
+  .hero .byline span { color: var(--cotton); }
+  .hero .avatar { background: var(--cherry); box-shadow: 0 0 0 2px var(--cotton); }
+  .hero time { color: var(--cotton); }
+
+  .kicker { color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; margin: 0 0 12px; }
+  h1 { font-size: clamp(30px, 5.4vw, 46px); line-height: 1.1; margin: 0 0 18px; letter-spacing: -.015em; font-weight: 700; }
+  h2 { font-size: 26px; margin: 64px 0 14px; padding-top: 14px; border-top: 2px solid var(--text); letter-spacing: -.01em; }
+  h2::before { content: ""; display: block; width: 48px; height: 6px; background: var(--cherry); margin: -20px 0 18px; }
+  h3 { font-size: 19px; margin: 32px 0 8px; }
+  .lede { font-size: 19px; color: var(--muted); margin: 0 0 20px; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { text-decoration-thickness: 2px; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre { margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
+  pre code, pre code.hljs { display: block; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; background: var(--code-bg); border-radius: 10px; }
+  sup a { text-decoration: none; font-family: "Space Grotesk", system-ui, sans-serif; font-size: 12px; }
+
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; font-size: 14px; color: var(--muted); margin: 0 0 8px; }
+  .byline { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+  .byline span { display: inline-flex; align-items: center; gap: 8px; color: var(--text); }
+  .avatar, .author-photo { position: relative; flex: none; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--cherry); color: var(--cotton); font: 700 12px "Space Grotesk", system-ui, sans-serif; letter-spacing: .04em; }
+  .avatar { width: 30px; height: 30px; }
+  .avatar img, .author-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+  .toc { margin: 24px 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-family: "Space Grotesk", system-ui, sans-serif; font-size: 15px; }
+  .toc strong { display: block; margin-bottom: 6px; }
+  .toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 24px; }
+  .toc a { color: var(--text); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  @media (max-width: 520px) { .toc ol { columns: 1; } }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 24px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--accent); border-radius: 4px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 28px; line-height: 1.2; color: var(--accent); letter-spacing: -.01em; margin-bottom: 6px; }
+  .stat span { display: block; font-size: 13px; line-height: 1.45; color: var(--muted); }
+
+  .table-wrap { overflow-x: auto; margin: 16px 0 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; font-variant-numeric: tabular-nums; vertical-align: top; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; background: var(--code-bg); }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.best { color: var(--good); font-weight: 700; }
+  table.wide th, table.wide td { white-space: normal; text-align: left; min-width: 150px; line-height: 1.45; }
+  table.wide th:first-child, table.wide td:first-child { min-width: 120px; font-weight: 600; }
+  .note { font-size: 14px; color: var(--muted); font-family: "Space Grotesk", system-ui, sans-serif; }
+
+  figure { margin: 28px 0; }
+  figure img { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 4px; background: var(--img-bg); }
+  figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
+  .dg-text { fill: var(--text); font: 15px "Space Grotesk", system-ui, sans-serif; }
+  .dg-small { fill: var(--muted); font: 13px "Space Grotesk", system-ui, sans-serif; }
+  .dg-title { font: 600 16px "Space Grotesk", system-ui, sans-serif; }
+
+  .model-tag { display: inline-block; font: 700 12px "Space Grotesk", system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; border: 1.5px solid currentColor; margin-bottom: 6px; }
+  .tree-c { color: var(--tree); } .forest-c { color: var(--forest); } .boost-c { color: var(--boost); }
+  dl.concepts { margin: 12px 0; }
+  dl.concepts dt { font-weight: 700; font-family: "Space Grotesk", system-ui, sans-serif; font-size: 15px; margin-top: 10px; }
+  dl.concepts dd { margin: 2px 0 0; }
+
+  details.deep { margin: 20px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  details.deep summary { cursor: pointer; padding: 12px 16px; font-weight: 600; font-size: 15px; }
+  details.deep > div { padding: 0 16px 14px; }
+  .formula { font-family: "Cambria Math", "Times New Roman", serif; font-size: 18px; text-align: center; margin: 12px 0; overflow-x: auto; }
+
+  .callout { background: var(--maroon); color: var(--cotton); border-left: 8px solid var(--cherry); border-radius: 2px; padding: 20px 24px; margin: 24px 0; }
+  .callout strong { color: #fff; }
+  .callout p { margin: 0; }
+  .callout p + p { margin-top: 10px; }
+  ol.qa { padding-left: 22px; }
+  ol.qa > li { margin-bottom: 18px; }
+  ol.qa > li > strong { font-family: "Space Grotesk", system-ui, sans-serif; display: block; margin-bottom: 2px; }
+
+  ul.links { padding-left: 20px; }
+  ul.links li { margin-bottom: 8px; }
+  ol.refs { font-size: 15px; padding-left: 28px; line-height: 1.55; }
+  ol.refs li { margin-bottom: 8px; }
+  ol.refs li:target { background: var(--accent-soft); }
+
+  .authors { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+  .author { background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--accent); border-radius: 4px; padding: 16px; font-size: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .author-photo { width: 64px; height: 64px; font-size: 20px; margin-bottom: 6px; box-shadow: 0 0 0 3px var(--surface), 0 0 0 4px var(--border); }
+  .author b { font-size: 16px; line-height: 1.3; }
+  .author p { margin: 0; color: var(--muted); }
+  .author a { font-size: 14px; }
+
+  footer { font-size: 13px; color: #c9c3b5; background: var(--noir); margin: 72px calc(50% - 50vw) -80px; padding: 28px calc(50vw - 50%) 36px; border-top: 6px solid var(--cherry); }
+  footer p { margin: 4px 0; }
+
+  .diagram { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Tablet */
+  @media (max-width: 860px) {
+    .site-header .inner { gap: 16px; }
+    .site-header nav { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); padding-right: 24px; }
+  }
+
+  /* Celular */
+  @media (max-width: 600px) {
+    body { font-size: 16px; line-height: 1.65; }
+    html { scroll-padding-top: 56px; }
+    .site-header .inner { height: 48px; gap: 12px; }
+    .site-header .brand { font-size: 12px; letter-spacing: .08em; }
+    .site-header nav { gap: 14px; font-size: 13px; }
+    .hero { padding-top: 36px; padding-bottom: 32px; margin-bottom: 24px; }
+    .hero .kicker { font-size: 11px; letter-spacing: .12em; }
+    .lede { font-size: 17px; }
+    .byline { gap: 8px 12px; }
+    .byline span { font-size: 13px; }
+    h2 { font-size: 22px; margin-top: 48px; }
+    h3 { font-size: 17px; }
+    .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat { padding: 12px; }
+    .stat b { font-size: 22px; }
+    .stat span { font-size: 12px; }
+    .toc { padding: 14px 16px; }
+    .toc ol { columns: 1; }
+    table { font-size: 13px; }
+    th, td { padding: 8px 10px; }
+    table.wide th, table.wide td { min-width: 130px; }
+    pre code, pre code.hljs { font-size: 12.5px; padding: 12px; }
+    .diagram { grid-template-columns: 1fr; }
+    .callout { padding: 16px 18px; border-left-width: 6px; }
+    ol.qa, ol.refs { padding-left: 20px; }
+    .formula { font-size: 16px; }
+    .authors { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .author { padding: 12px; }
+    .author-photo { width: 52px; height: 52px; font-size: 17px; }
+    .author b { font-size: 14px; }
+    .author a { font-size: 13px; word-break: break-all; }
+    footer { margin-top: 56px; }
+  }
+  @media (max-width: 360px) {
+    .stats, .authors { grid-template-columns: 1fr; }
+  }
+  footer a { color: var(--cotton); }
+  footer sup a { color: #f0b7ae; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="#">Preditor de redes</a>
+    <nav aria-label="Seções">
+      <a href="#arvore">Árvore</a>
+      <a href="#random-forest">Random Forest</a>
+      <a href="#xgboost">XGBoost</a>
+      <a href="#comparacao">Comparação</a>
+      <a href="#experimento">Experimento</a>
+      <a href="#resultados">Resultados</a>
+      <a href="#recomendacao">Recomendação</a>
+      <a href="#referencias">Referências</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero">
+<p class="kicker">Aprendizado de máquina · Monitoramento de redes</p>
+<h1>Árvore, floresta ou boosting? Prevendo a degradação de uma rede 12 minutos antes</h1>
+<p class="lede">Explicamos Árvore de Decisão, Random Forest e XGBoost para quem já programa em Python, colocamos os três para prever o estado de caminhos reais da internet 12 minutos à frente e comparamos com a regra mais simples possível: repetir o estado de agora.</p>
+
+<!-- AUTORES em ordem alfabética. Fotos opcionais em img/autores/<usuario-github>.jpg; sem foto, aparecem as iniciais. -->
+<div class="meta">
+  <div class="byline">
+    <span><span class="avatar" aria-hidden="true">AS<img onerror="this.remove()" src="img/autores/apollomoura.jpg" alt=""></span>Apollo Moura De Sousa</span>
+    <span><span class="avatar" aria-hidden="true">IS<img onerror="this.remove()" src="img/autores/clicaro.jpg" alt=""></span>Icaro Luiz Dellalo Silva</span>
+    <span><span class="avatar" aria-hidden="true">IO<img onerror="this.remove()" src="img/autores/iedahirari.jpg" alt=""></span>Ieda de Oliveira</span>
+    <span><span class="avatar" aria-hidden="true">JM<img onerror="this.remove()" src="img/autores/zorahsai.jpg" alt=""></span>João Pedro C. de Morais</span>
+    <span><span class="avatar" aria-hidden="true">LG<img onerror="this.remove()" src="img/autores/superlucas2000.jpg" alt=""></span>Lucas Matteus Baptista de Godoy</span>
+  </div>
+  <span>Publicado em <time datetime="2026-10-18">18/10/2026</time> · Revisado em <time datetime="2026-10-18">18/10/2026</time></span>
+</div>
+</section>
+
+<div class="stats">
+  <div class="stat"><b>+0,012</b><span>de F1 macro do melhor modelo (XGBoost, 0,765) sobre a persistência (0,753), no teste</span></div>
+  <div class="stat"><b>4 de 1.990</b><span>inícios de FALHA anunciados com 12 minutos de antecedência pelo melhor modelo</span></div>
+  <div class="stat"><b>446</b><span>alarmes falsos de FALHA na Random Forest e no XGBoost, contra 2.008 da persistência</span></div>
+  <div class="stat"><b>0,56 ms</b><span>latência da árvore por medição (XGBoost 1,5 ms, Random Forest 15,7 ms)</span></div>
+</div>
+
+<nav class="toc" aria-label="Índice">
+  <strong>Neste artigo</strong>
+  <ol>
+    <li><a href="#introducao">O problema</a></li>
+    <li><a href="#arvore">Árvore de Decisão</a></li>
+    <li><a href="#random-forest">Random Forest</a></li>
+    <li><a href="#xgboost">XGBoost</a></li>
+    <li><a href="#comparacao">Os três lado a lado</a></li>
+    <li><a href="#experimento">O experimento</a></li>
+    <li><a href="#resultados">Resultados</a></li>
+    <li><a href="#literatura">O que outros trabalhos encontraram</a></li>
+    <li><a href="#recomendacao">Recomendação</a></li>
+    <li><a href="#limitacoes">Limitações</a></li>
+    <li><a href="#observacao">Quadro de observação</a></li>
+    <li><a href="#links">Para ler mais</a></li>
+    <li><a href="#referencias">Referências</a></li>
+  </ol>
+</nav>
+
+<h2 id="introducao">O problema: avisar antes que o caminho degrade</h2>
+<p>Quem opera uma rede quer saber se um caminho entre dois pontos da internet está bem, piorando ou quebrado. Um <strong>ping</strong> mede o tempo de ida e volta de um pacote, o <strong>RTT</strong> (<em>round-trip time</em>). Mas RTT alto, sozinho, não quer dizer problema: um caminho entre o Iraque e o Japão leva 315 ms todos os dias e está saudável, enquanto um caminho dentro de Auckland que sai de 1 ms para 12 ms está com algo errado.</p>
+<p>Por isso, no projeto integrador do grupo, cada medição recebe uma classe comparando o RTT com o <strong>normal daquele mesmo caminho</strong>: <strong>OK</strong> (nada a fazer), <strong>RISCO</strong> (observar) ou <strong>FALHA</strong> (investigar). Saber a classe de agora é útil. Saber a classe <strong>daqui a 12 minutos</strong> seria melhor: daria tempo de agir antes.</p>
+<p>Neste artigo vamos treinar três modelos de <strong>aprendizado de máquina</strong> (programas que aprendem regras a partir de exemplos, em vez de regras escritas à mão) para responder: <em>olhando a medição de agora, qual será a classe deste caminho 12 minutos depois?</em> E vamos comparar os três com a regra que qualquer pessoa usaria sem modelo nenhum, a <strong>persistência</strong>: "daqui a 12 minutos vai estar como está agora". Ao final você vai saber como cada modelo funciona, como compará-los de forma justa e quanto um modelo de fato acrescenta a essa regra simples.</p>
+
+<h2 id="arvore"><span class="model-tag tree-c">Modelo 1</span><br>Árvore de Decisão</h2>
+<h3>Um exemplo antes da teoria</h3>
+<p>Vamos começar treinando uma árvore com apenas <strong>3 níveis</strong> de perguntas sobre a medição de agora. Mesmo pequena, ela já chega a F1 macro de 0,711 na validação, praticamente igual à persistência (0,713), e dá para ler as regras que aprendeu:</p>
+<ul>
+  <li><em>"Se o RTT está a até 3,4 desvios do normal e houve no máximo 1 desvio moderado nas últimas 5 medições, daqui a 12 minutos o caminho estará <strong>OK</strong>."</em> É o caso de 77% das medições: a rede passa a maior parte do tempo no próprio normal.</li>
+  <li><em>"Se o RTT está a mais de 3,4 desvios do normal e o jitter não está alto, daqui a 12 minutos o caminho estará em <strong>FALHA</strong>."</em> Um desvio grande e estável costuma continuar.</li>
+  <li><em>"Se o RTT está a mais de 3,4 desvios, mas o jitter está alto e o desvio não vinha se repetindo, o caminho volta a <strong>OK</strong>."</em> É um pico isolado: ele tende a passar.</li>
+</ul>
+<figure>
+  <img src="img/arvore_profundidade3.png" alt="Diagrama da árvore de decisão de profundidade 3. A raiz pergunta se z_robusto é no máximo 3,43. Do lado verdadeiro, as perguntas são sobre n5_risco e levam a OK ou RISCO. Do lado falso, as perguntas são sobre jitter_relativo, z_robusto e n5_risco e levam a FALHA ou OK">
+  <figcaption>Figura 1. Árvore de profundidade 3 treinada nos nossos dados. Cada caixa é uma pergunta sobre a medição de agora; as folhas dão a classe prevista para daqui a 12 minutos. A borda indica a classe: verde OK, amarelo RISCO, vermelho FALHA.</figcaption>
+</figure>
+
+<h3>O que é e como funciona</h3>
+<p>Uma árvore de decisão faz uma sequência de perguntas do tipo "atributo ≤ limite?" até chegar a uma resposta. Para construí-la, o algoritmo testa, em cada ponto, todas as perguntas possíveis e escolhe a que melhor separa as classes. Depois repete o processo em cada lado, até um critério de parada.</p>
+<dl class="concepts">
+  <dt>Nó e folha</dt>
+  <dd>Um <strong>nó</strong> é uma pergunta. Uma <strong>folha</strong> é o fim do caminho, onde a árvore dá a resposta (a classe mais comum entre os exemplos de treino que chegaram ali).</dd>
+  <dt>Critério de divisão (Gini ou entropia)</dt>
+  <dd>Mede o quanto um grupo está "misturado". Um grupo só de medições OK tem impureza zero. A melhor pergunta é a que deixa os dois grupos resultantes mais puros.</dd>
+  <dt>Profundidade</dt>
+  <dd>O número máximo de perguntas em sequência. Mais profundidade permite regras mais detalhadas.</dd>
+  <dt>Overfitting e variância</dt>
+  <dd>Uma árvore profunda demais pode <strong>decorar</strong> o treino (overfitting): cria regras para casos isolados que não se repetem em dados novos. Ela também tem <strong>alta variância</strong>: mudar um pouco os dados de treino pode mudar bastante a árvore. Vamos ver isso acontecer no experimento.</dd>
+  <dt>Poda</dt>
+  <dd>Remover ramos que quase não melhoram o acerto, para deixar a árvore mais simples e menos sujeita a overfitting. No scikit-learn isso é o parâmetro <code>ccp_alpha</code><sup><a href="#ref-6">[6]</a></sup>.</dd>
+</dl>
+<details class="deep">
+  <summary>Aprofundamento: a fórmula da impureza de Gini</summary>
+  <div>
+    <p>Se num nó a fração de exemplos da classe <i>k</i> é <i>p<sub>k</sub></i>, a impureza de Gini é:</p>
+    <p class="formula">G = 1 − Σ<sub>k</sub> p<sub>k</sub><sup>2</sup></p>
+    <p>No nosso treino, a raiz tem 83% de OK, 7% de RISCO e 11% de FALHA: G = 1 − (0,83² + 0,07² + 0,11²) ≈ 0,30. Com as três classes em partes iguais, G chegaria a 0,67, a mistura máxima para três classes. Com 100% de uma só classe, G = 0. A entropia, H = −Σ p<sub>k</sub> log<sub>2</sub> p<sub>k</sub>, mede a mesma ideia com outra escala. Em cada nó, o algoritmo escolhe a pergunta que mais reduz a impureza média ponderada dos filhos.</p>
+  </div>
+</details>
+<p><strong>Quando faz sentido:</strong> quando é preciso explicar cada decisão, quando a latência tem que ser mínima, ou como ponto de partida antes de modelos mais complexos.</p>
+
+<h2 id="random-forest"><span class="model-tag forest-c">Modelo 2</span><br>Random Forest</h2>
+<p>Se uma árvore sozinha muda muito com pequenas mudanças nos dados, uma ideia natural é treinar <strong>muitas árvores diferentes e fazer uma votação</strong>. É isso que a Random Forest faz<sup><a href="#ref-1">[1]</a></sup>. Cada árvore erra de um jeito, e a maioria tende a acertar.</p>
+<p>Para que as árvores sejam diferentes entre si, a Random Forest usa duas fontes de sorteio:</p>
+<dl class="concepts">
+  <dt>Amostra bootstrap e bagging</dt>
+  <dd>Cada árvore é treinada numa <strong>amostra bootstrap</strong>: um sorteio <em>com reposição</em> do mesmo tamanho do treino, em que alguns exemplos aparecem repetidos e outros ficam de fora. Treinar modelos em amostras bootstrap e juntar os votos se chama <strong>bagging</strong> (<em>bootstrap aggregating</em>).</dd>
+  <dt>Seleção aleatória de atributos</dt>
+  <dd>Em cada nó, a árvore só pode escolher a pergunta entre um <strong>subconjunto sorteado</strong> de atributos. No nosso melhor modelo, são 2 dos 8 atributos por pergunta (a raiz quadrada de 8, arredondada para baixo). Isso impede que todas as árvores comecem pela mesma pergunta óbvia.</dd>
+  <dt>Votação</dt>
+  <dd>A classe final é a mais votada entre as árvores.</dd>
+  <dt>Erro out-of-bag</dt>
+  <dd>Cerca de 37% dos exemplos ficam de fora de cada amostra bootstrap. Avaliar cada árvore nesses exemplos "fora do saco" dá uma estimativa de erro sem separar um conjunto de validação.</dd>
+  <dt>Importância dos atributos</dt>
+  <dd>Somando, em todas as árvores, o quanto cada atributo reduziu a impureza, obtemos um ranking dos atributos que mais pesam na decisão.</dd>
+</dl>
+<p>Por que isso funciona? A floresta <strong>reduz a variância</strong>: a média de muitas árvores parecidas, mas não iguais, oscila menos que uma árvore só. Vimos isso no experimento. Com 1 árvore, o F1 macro de validação variou entre 0,672 e 0,694 conforme a semente; a partir de 25 árvores, ficou entre 0,70 e 0,72, e com 200 árvores a faixa caiu para 0,713 a 0,717.</p>
+<figure>
+  <img src="img/rf_numero_arvores.png" alt="F1 macro de validação da Random Forest em função do número de árvores, em escala logarítmica, com faixa mínima e máxima entre 3 sementes que se estreita conforme as árvores aumentam">
+  <figcaption>Figura 2. Random Forest: número de árvores × F1 macro na validação. A faixa (mínimo e máximo entre 3 sementes) se estreita com mais árvores.</figcaption>
+</figure>
+<details class="deep">
+  <summary>Aprofundamento: por que a média reduz a variância</summary>
+  <div>
+    <p>Se cada árvore tem variância σ² e a correlação entre duas árvores é ρ, a variância da média de <i>B</i> árvores é<sup><a href="#ref-1">[1]</a></sup>:</p>
+    <p class="formula">ρσ² + (1 − ρ)σ² / B</p>
+    <p>Aumentar <i>B</i> elimina o segundo termo, mas não o primeiro. Por isso a Random Forest sorteia atributos em cada nó: árvores menos correlacionadas (ρ menor) tornam a média mais estável.</p>
+  </div>
+</details>
+<p><strong>Quando faz sentido:</strong> quando se quer um modelo robusto com pouco ajuste, que raramente dá overfitting grave e funciona bem "de fábrica"<sup><a href="#ref-11">[11]</a></sup>.</p>
+
+<h2 id="xgboost"><span class="model-tag boost-c">Modelo 3</span><br>XGBoost</h2>
+<p>O XGBoost (<em>eXtreme Gradient Boosting</em>) também combina muitas árvores, mas de um jeito diferente. Em vez de treiná-las em paralelo e votar, ele as treina <strong>em sequência</strong>: cada nova árvore tenta corrigir os erros que as anteriores ainda cometem. A previsão final é a <strong>soma</strong> de todas as árvores<sup><a href="#ref-2">[2]</a></sup><sup><a href="#ref-5">[5]</a></sup>.</p>
+<figure>
+  <div class="diagram">
+  <svg viewBox="0 10 345 285" role="img" aria-labelledby="dg-bag">
+    <title id="dg-bag">Bagging: três árvores treinadas em paralelo, cada uma numa amostra diferente dos dados, combinadas por votação da maioria.</title>
+    <defs>
+      <marker id="arrow-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--forest)"/></marker>
+    </defs>
+    <text x="172" y="36" text-anchor="middle" class="dg-title" fill="var(--forest)">Bagging (Random Forest)</text>
+    <text x="172" y="56" text-anchor="middle" class="dg-small">em paralelo · reduz a variância</text>
+    <g fill="none" stroke="var(--forest)" stroke-width="2.5">
+      <rect x="20" y="80" width="80" height="44" rx="10"/>
+      <rect x="20" y="154" width="80" height="44" rx="10"/>
+      <rect x="20" y="228" width="80" height="44" rx="10"/>
+      <rect x="130" y="80" width="80" height="44" rx="10"/>
+      <rect x="130" y="154" width="80" height="44" rx="10"/>
+      <rect x="130" y="228" width="80" height="44" rx="10"/>
+      <rect x="240" y="146" width="90" height="60" rx="10"/>
+      <path d="M100 102 H128 M100 176 H128 M100 250 H128" marker-end="url(#arrow-f)"/>
+      <path d="M210 102 C228 102 222 170 238 170 M210 176 H238 M210 250 C228 250 222 182 238 182" marker-end="url(#arrow-f)"/>
+    </g>
+    <g class="dg-text" text-anchor="middle">
+      <text x="60" y="107">amostra 1</text><text x="60" y="181">amostra 2</text><text x="60" y="255">amostra 3</text>
+      <text x="170" y="107">árvore 1</text><text x="170" y="181">árvore 2</text><text x="170" y="255">árvore 3</text>
+      <text x="285" y="173">votação</text><text x="285" y="192" class="dg-small">da maioria</text>
+    </g>
+  </svg>
+  <svg viewBox="355 10 325 285" role="img" aria-labelledby="dg-boost">
+    <title id="dg-boost">Boosting: três árvores em sequência, cada uma corrigindo o erro das anteriores, com as previsões somadas.</title>
+    <defs>
+      <marker id="arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--boost)"/></marker>
+    </defs>
+    <text x="515" y="36" text-anchor="middle" class="dg-title" fill="var(--boost)">Boosting (XGBoost)</text>
+    <text x="515" y="56" text-anchor="middle" class="dg-small">em sequência · reduz o viés</text>
+    <g fill="none" stroke="var(--boost)" stroke-width="2.5">
+      <rect x="370" y="144" width="72" height="44" rx="10"/>
+      <rect x="470" y="144" width="72" height="44" rx="10"/>
+      <rect x="570" y="144" width="72" height="44" rx="10"/>
+      <circle cx="606" cy="252" r="30"/>
+      <path d="M442 166 H468 M542 166 H568" marker-end="url(#arrow-b)"/>
+      <path d="M606 188 V220" marker-end="url(#arrow-b)"/>
+    </g>
+    <g class="dg-text" text-anchor="middle">
+      <text x="406" y="171">árv. 1</text><text x="506" y="171">árv. 2</text><text x="606" y="171">árv. 3</text>
+      <text x="606" y="257">soma</text>
+    </g>
+    <g class="dg-small" text-anchor="middle" fill="var(--boost)">
+      <text x="455" y="113">corrige</text><text x="455" y="128">o erro</text>
+      <text x="555" y="113">corrige</text><text x="555" y="128">o erro</text>
+    </g>
+    <text x="380" y="232" class="dg-small">cada passo é</text>
+    <text x="380" y="250" class="dg-small">multiplicado pela</text>
+    <text x="380" y="268" class="dg-small">taxa de aprendizado</text>
+  </svg>
+  </div>
+  <figcaption>Figura 3. As duas formas de combinar árvores. No bagging as árvores são independentes e votam; no boosting cada árvore depende das anteriores e as previsões são somadas.</figcaption>
+</figure>
+<dl class="concepts">
+  <dt>Boosting e gradient boosting</dt>
+  <dd><strong>Boosting</strong> é treinar modelos fracos em sequência, cada um focado no que os anteriores erraram. No <strong>gradient boosting</strong><sup><a href="#ref-3">[3]</a></sup>, "o que falta acertar" é medido pelo gradiente da função de erro, e cada árvore nova aprende a apontar nessa direção<sup><a href="#ref-12">[12]</a></sup>.</dd>
+  <dt>Taxa de aprendizado</dt>
+  <dd>Quanto de cada árvore nova entra na soma. Com taxa alta o modelo aprende rápido e pode passar do ponto; com taxa baixa precisa de mais árvores, mas costuma generalizar melhor.</dd>
+  <dt>Regularização</dt>
+  <dd>Uma penalidade para árvores complicadas demais (muitas folhas ou folhas com valores extremos), que o XGBoost inclui diretamente no objetivo que otimiza<sup><a href="#ref-2">[2]</a></sup>.</dd>
+  <dt>Profundidade máxima</dt>
+  <dd>No boosting as árvores costumam ser mais rasas que na Random Forest, porque cada uma só precisa corrigir um pedaço do erro.</dd>
+  <dt>Early stopping</dt>
+  <dd>Parada antecipada: o treino para de adicionar árvores quando o erro na validação deixa de cair por um número de rodadas. Evita overfitting e economiza tempo<sup><a href="#ref-13">[13]</a></sup>.</dd>
+  <dt>Desbalanceamento de classes</dt>
+  <dd>Quando uma classe é muito mais rara, o modelo tende a ignorá-la. Dá para dar mais peso às classes raras com pesos por amostra (<code>sample_weight</code>)<sup><a href="#ref-5">[5]</a></sup>. No nosso ajuste, os três modelos podiam testar pesos para RISCO e FALHA. Nenhum dos vencedores usou.</dd>
+</dl>
+<p>Por que isso funciona? O boosting <strong>reduz o viés</strong>: o modelo começa simples demais e, a cada rodada, fica mais capaz de capturar padrões que antes escapavam. O risco é o oposto do da floresta: continuar adicionando árvores até decorar o treino. É para isso que servem a taxa de aprendizado e o early stopping. No nosso experimento, a parada antecipada interrompeu o treino em cerca de 40 rodadas com taxa 0,3, cerca de 120 com taxa 0,1 e 452 com taxa 0,03.</p>
+<figure>
+  <img src="img/xgb_taxa_aprendizado.png" alt="Curvas de log-loss do XGBoost por rodada para taxas de aprendizado 0,3, 0,1 e 0,03, com linhas verticais marcando o ponto em que o early stopping parou cada uma, perto de 40, 120 e 450 rodadas">
+  <figcaption>Figura 4. XGBoost com três taxas de aprendizado. Taxas menores descem mais devagar e param mais tarde (tracejado = treino, contínuo = validação, pontilhado = ponto de parada).</figcaption>
+</figure>
+<details class="deep">
+  <summary>Aprofundamento: o objetivo que o XGBoost minimiza</summary>
+  <div>
+    <p>A previsão após <i>t</i> rodadas é a anterior mais uma nova árvore <i>f<sub>t</sub></i>, multiplicada pela taxa de aprendizado η:</p>
+    <p class="formula">ŷ<sup>(t)</sup> = ŷ<sup>(t−1)</sup> + η · f<sub>t</sub>(x)</p>
+    <p>Cada árvore é escolhida para minimizar o erro somado a uma penalidade de complexidade<sup><a href="#ref-2">[2]</a></sup><sup><a href="#ref-5">[5]</a></sup>:</p>
+    <p class="formula">Σ<sub>i</sub> l(y<sub>i</sub>, ŷ<sub>i</sub>) + Σ<sub>k</sub> Ω(f<sub>k</sub>), &nbsp; Ω(f) = γT + ½ λ ‖w‖²</p>
+    <p>Aqui <i>T</i> é o número de folhas e <i>w</i> são os valores das folhas. γ penaliza árvores com muitas folhas, e λ (o <code>reg_lambda</code>) penaliza folhas com valores grandes. Com três classes, o XGBoost treina, em cada rodada, uma árvore por classe e transforma as somas em probabilidades.</p>
+  </div>
+</details>
+<p><strong>Quando faz sentido:</strong> dados tabulares em que se quer o máximo de acerto e há tempo para ajustar hiperparâmetros. É o modelo que mais vence competições com esse tipo de dado<sup><a href="#ref-2">[2]</a></sup>, mas, como veremos, a vantagem pode ser pequena.</p>
+
+<h2 id="comparacao">Os três lado a lado</h2>
+<div class="table-wrap">
+<table class="wide">
+  <thead><tr><th></th><th class="tree-c">Árvore de Decisão</th><th class="forest-c">Random Forest</th><th class="boost-c">XGBoost</th></tr></thead>
+  <tbody>
+    <tr><td>Como funciona</td><td>Uma sequência de perguntas sobre os atributos</td><td>Centenas de árvores independentes em amostras bootstrap, com votação</td><td>Árvores em sequência, cada uma corrigindo o erro das anteriores, com soma</td></tr>
+    <tr><td>Reduz principalmente</td><td>Nada: é o bloco básico</td><td>Variância</td><td>Viés</td></tr>
+    <tr><td>Vantagens</td><td>Simples, rápida, lê-se como regras</td><td>Robusta, pouco ajuste, difícil de dar overfitting grave</td><td>Geralmente o maior acerto em dados tabulares; regularização e early stopping embutidos</td></tr>
+    <tr><td>Desvantagens</td><td>Instável; overfitting se profunda demais</td><td>Lenta para prever uma medição por vez; modelo grande</td><td>Mais hiperparâmetros para ajustar; treino mais lento</td></tr>
+    <tr><td>Interpretabilidade</td><td>Alta: cada decisão tem um caminho legível</td><td>Média: importância global dos atributos</td><td>Média: importância global; SHAP para explicar casos<sup><a href="#ref-10">[10]</a></sup></td></tr>
+    <tr><td>Tempo de treino (nosso experimento)</td><td>0,3 s</td><td>1,3 s</td><td>7,2 s</td></tr>
+    <tr><td>Risco de overfitting</td><td>Alto sem poda</td><td>Baixo</td><td>Médio, controlado por taxa, regularização e early stopping</td></tr>
+    <tr><td>Cenário ideal</td><td>Precisa explicar cada alerta ou decidir com custo mínimo</td><td>Quer um bom modelo com pouco esforço de ajuste</td><td>Quer o máximo de acerto e tem tempo para ajustar</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">Tabela 1. Quadro comparativo dos três modelos. Os tempos são do nosso experimento; o resto resume as referências [1], [2], [5], [9] e [11].</p>
+
+<h2 id="experimento">O experimento</h2>
+<h3>Os dados</h3>
+<p>O <strong>RIPE Atlas</strong><sup><a href="#ref-7">[7]</a></sup> é uma rede de sondas mantida pelo RIPE NCC que mede a internet e publica os resultados. Entre os servidores mais estáveis dessa rede (as <strong>Anchors</strong>), há pings automáticos a cada 240 segundos, com 3 pacotes por vez. No projeto integrador<sup><a href="#ref-14">[14]</a></sup>, o grupo baixou 14 dias dessas medições para 92 <strong>fluxos</strong> (um fluxo é o par sonda de origem → servidor de destino), com RTT normal de 1 ms a 315 ms.</p>
+<p>A primeira semana serviu só para aprender o <strong>normal de cada fluxo</strong>: a mediana do RTT e o quanto ele costuma variar (o MAD, a mediana dos desvios absolutos<sup><a href="#ref-15">[15]</a></sup>). A segunda semana, de 13/09/2026 04:32 a 20/09/2026 04:32 UTC, foi rotulada pela regra do projeto, que olha o desvio em relação a esse normal, a perda de pacotes e a repetição dos desvios. É essa segunda semana que usamos aqui.</p>
+<p>Cada linha é uma medição de um fluxo. Os modelos recebem 8 <strong>atributos</strong>, todos relativos ao normal do próprio fluxo:</p>
+<div class="table-wrap">
+<table class="wide">
+  <thead><tr><th>Atributo</th><th>O que mede</th></tr></thead>
+  <tbody>
+    <tr><td><code>z_robusto</code></td><td>Quantos "desvios típicos" o RTT de agora está acima do normal do fluxo</td></tr>
+    <tr><td><code>aumento_pct</code></td><td>Quanto o RTT subiu em relação ao normal, em %</td></tr>
+    <tr><td><code>jitter_relativo</code></td><td>Variação do RTT agora dividida pela variação típica do fluxo</td></tr>
+    <tr><td><code>perda_pct</code>, <code>timeout_atual</code></td><td>Pacotes perdidos nesta medição; 1 se nenhum voltou</td></tr>
+    <tr><td><code>n5_timeout</code>, <code>n5_aumento80</code>, <code>n5_risco</code></td><td>Nas últimas 5 medições: timeouts, aumentos acima de 80% e desvios moderados</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">Tabela 2. Os 8 atributos. O RTT em milissegundos, o país e o destino ficam de fora de propósito: com eles, um modelo aprenderia que "caminho longo = problema", que é justamente o erro que o projeto quer evitar.</p>
+<p>O <strong>alvo</strong> é a classe do mesmo fluxo <strong>3 medições depois</strong> (3 × 240 s = 12 minutos). Só aceitamos o par quando a medição futura está mesmo a 11 a 13 minutos de distância e no mesmo bloco de tempo da medição de agora. Sobraram 227.112 pares. Antes de salvar qualquer arquivo, trocamos cada fluxo por um código (<code>F01</code> a <code>F92</code>) e removemos os endereços IP: nada que identifique um servidor é publicado.</p>
+<figure>
+  <img src="img/distribuicao_classes.png" alt="Barras horizontais com a porcentagem de OK, RISCO e FALHA no treino, na validação e no teste; OK fica entre 78% e 83%, RISCO entre 6% e 8% e FALHA entre 11% e 14%">
+  <figcaption>Figura 5. Distribuição da classe daqui a 12 minutos em cada bloco. A rede passa a maior parte do tempo no próprio normal.</figcaption>
+</figure>
+<p>A classe muda em 12 minutos em apenas 13,5% das medições. É por isso que a persistência é uma régua difícil de bater: ela acerta sempre que nada muda e erra <strong>toda</strong> mudança. O que um preditor pode acrescentar está nessas mudanças, em especial nos <strong>inícios de FALHA</strong>: medições em que o caminho ainda não está em FALHA, mas vai estar daqui a 12 minutos. São 1.990 no teste.</p>
+
+<h3>Uma comparação justa</h3>
+<ol>
+  <li>Os três modelos usam <strong>os mesmos dados</strong>, a <strong>mesma divisão</strong> e a <strong>mesma semente</strong> (42).</li>
+  <li>A divisão é <strong>no tempo</strong>, a mesma do projeto: <strong>treino</strong> nos primeiros 3,5 dias (115.183 pares), <strong>validação</strong> no trecho seguinte (45.227) e <strong>teste</strong> nos últimos 2,1 dias (66.702). Sortear linhas aleatórias colocaria medições vizinhas do mesmo fluxo no treino e no teste, e o resultado ficaria otimista.</li>
+  <li>Cada modelo recebeu o <strong>mesmo esforço de ajuste</strong>: 12 combinações de <strong>hiperparâmetros</strong> (configurações escolhidas antes do treino, como a profundidade máxima) sorteadas, e venceu a de maior F1 macro na validação. O teste foi usado <strong>uma única vez</strong>, no final.</li>
+</ol>
+
+<h3>O código, em três trechos</h3>
+<p>Os notebooks completos estão em <a href="https://github.com/iedahirari/artigo-preditor-redes/tree/main/notebooks"><code>notebooks/</code></a>. Estes são os pontos principais.</p>
+<p><strong>1. Criar o alvo sem trapacear.</strong> O futuro é sempre do mesmo fluxo, a cerca de 12 minutos e no mesmo bloco de tempo.</p>
+<pre><code class="language-python">grupo = dados.sort_values(["fluxo", "timestamp"]).groupby("fluxo")
+dados["classe_futura"] = grupo["classe"].shift(-3)          # 3 medições à frente
+dados["bloco_futuro"]  = grupo["bloco"].shift(-3)
+segundos = (grupo["timestamp"].shift(-3) - dados["timestamp"]).dt.total_seconds()
+
+valido = (dados["classe_futura"].notna() & segundos.between(660, 780)    # 11 a 13 minutos
+          & (dados["bloco"] == dados["bloco_futuro"]))                     # sem vazar de um bloco para outro
+dados = dados[valido]</code></pre>
+<p><strong>2. Os três modelos vencedores, com a mesma semente.</strong> O XGBoost usa a validação, e nunca o teste, para o early stopping.</p>
+<pre><code class="language-python">arvore = DecisionTreeClassifier(max_depth=4, criterion="entropy", ccp_alpha=1e-5, random_state=42)
+floresta = RandomForestClassifier(n_estimators=100, max_depth=12, max_features="sqrt",
+                                  min_samples_leaf=5, n_jobs=-1, random_state=42)
+xgb = XGBClassifier(n_estimators=1000, learning_rate=0.03, max_depth=6, subsample=0.85,
+                    colsample_bytree=0.6, reg_lambda=1.0, min_child_weight=3,
+                    objective="multi:softprob", early_stopping_rounds=30,
+                    eval_metric="mlogloss", tree_method="hist", n_jobs=-1, random_state=42)
+
+arvore.fit(X_treino, y_treino)
+floresta.fit(X_treino, y_treino)
+xgb.fit(X_treino, y_treino, eval_set=[(X_val, y_val)], verbose=False)   # parou em 452 árvores</code></pre>
+<p><strong>3. A régua: a persistência.</strong> Ela não aprende nada; só repete a classe de agora.</p>
+<pre><code class="language-python">def persistencia(parte):
+    return parte["classe_atual"].map(CODIGO).to_numpy()   # daqui a 12 min = como está agora
+
+f1_macro = f1_score(y_teste, modelo.predict(X_teste), average="macro")   # o teste é usado só aqui</code></pre>
+<p class="note">Versões: Python 3.14.7, numpy 2.5.4, pandas 3.0.6, scikit-learn 1.9.1, xgboost 3.4.1. Os hiperparâmetros acima são os vencedores do ajuste.</p>
+
+<h3>Como medimos</h3>
+<p>Com três classes e quase 80% de OK, a <strong>acurácia</strong> (acertos ÷ total) engana: um modelo que sempre diz OK acerta 78% e não serve para nada. Por isso a métrica principal é o <strong>F1 macro</strong>: a média do F1 de OK, RISCO e FALHA, com o mesmo peso para cada classe. O F1 de uma classe combina a <strong>precisão</strong> (dos alarmes dados para essa classe, quantos estavam certos?) e o <strong>recall</strong> (dos casos que existiam, quantos foram pegos?).</p>
+<p>Para FALHA, os dois erros têm custos diferentes. Uma <strong>FALHA perdida</strong> (falso negativo) é um caminho degradando sem ninguém olhar, o erro mais caro. Um <strong>alarme falso de FALHA</strong> (falso positivo) faz a equipe investigar um caminho saudável; muitos deles cansam a equipe e fazem os alertas serem ignorados. Também medimos o <strong>recall de início de FALHA</strong>, a parte que a persistência nunca acerta.</p>
+
+<h3>O que acontece quando a árvore cresce</h3>
+<p>Aqui o overfitting aparece claramente. O F1 macro de validação chega ao máximo, 0,711, com profundidade 3 ou 4, e depois cai. Sem limite, a árvore chega a 60 níveis, acerta 0,998 no treino e só 0,618 na validação: decorou o passado. Repare também na linha tracejada. Nenhuma profundidade passa da persistência na validação, o primeiro sinal de que a margem para um modelo é pequena.</p>
+<figure>
+  <img src="img/overfitting_profundidade.png" alt="Curvas de F1 macro no treino e na validação em função da profundidade da árvore. O treino sobe até 0,998; a validação atinge 0,711 na profundidade 3 ou 4 e cai até 0,618, sempre abaixo ou na altura da linha da persistência em 0,713">
+  <figcaption>Figura 6. F1 macro no treino e na validação conforme a profundidade da árvore. A linha tracejada é a persistência na validação.</figcaption>
+</figure>
+
+<h2 id="resultados">Resultados no teste</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Modelo</th><th>F1 macro</th><th>Recall FALHA</th><th>Precisão FALHA</th><th>Recall RISCO</th><th>Início de FALHA</th><th>FALHA perdidas</th><th>Alarmes falsos de FALHA</th></tr></thead>
+  <tbody>
+    <tr><td>Árvore de Decisão</td><td>0,759</td><td>0,711</td><td>0,913</td><td>0,376</td><td class="best">0,002</td><td>2.763</td><td>650</td></tr>
+    <tr><td>Random Forest</td><td>0,763</td><td>0,698</td><td class="best">0,937</td><td>0,387</td><td>0,002</td><td>2.888</td><td class="best">446</td></tr>
+    <tr><td>XGBoost</td><td class="best">0,765</td><td>0,697</td><td class="best">0,937</td><td>0,397</td><td class="best">0,002</td><td>2.903</td><td class="best">446</td></tr>
+    <tr><td>Persistência</td><td>0,753</td><td class="best">0,792</td><td>0,791</td><td class="best">0,541</td><td>0,000</td><td class="best">1.990</td><td>2.008</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">Tabela 3. Métricas no teste (66.702 medições; 9.566 FALHA e 5.067 RISCO daqui a 12 minutos). Em destaque, o melhor valor de cada coluna. Início de FALHA: a árvore e o XGBoost anunciaram 4 dos 1.990 inícios, a Random Forest 3.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Modelo</th><th>Treino (s)</th><th>Predição em lote, 66.702 medições (s)</th><th>Latência por medição (ms)</th></tr></thead>
+  <tbody>
+    <tr><td>Árvore de Decisão</td><td class="best">0,31</td><td class="best">0,006</td><td class="best">0,56</td></tr>
+    <tr><td>Random Forest</td><td>1,33</td><td>0,072</td><td>15,7</td></tr>
+    <tr><td>XGBoost</td><td>7,21</td><td>0,243</td><td>1,53</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">Tabela 4. Tempos medidos num notebook pessoal (mediana de várias repetições). Os tempos variam um pouco entre execuções; as métricas de acerto não. A latência classifica uma medição por vez, como faria um monitor a cada novo ping.</p>
+
+<p>Três leituras importantes:</p>
+<ul>
+  <li><strong>Os três modelos empatam entre si e ganham pouco da persistência.</strong> O F1 macro vai de 0,759 a 0,765, contra 0,753 da regra que só repete o estado de agora. A diferença entre o melhor e o pior modelo (0,006) é do tamanho do que se espera de uma execução para outra.</li>
+  <li><strong>Nenhum modelo prevê o início de uma FALHA.</strong> Dos 1.990 inícios no teste, o melhor modelo anunciou 4. Olhando só a medição de agora e as últimas 5, não há sinal suficiente de que um caminho saudável vai degradar 12 minutos depois.</li>
+  <li><strong>O ganho dos modelos está no fim das falhas, não no começo.</strong> A persistência diz FALHA sempre que o caminho está em FALHA agora, e erra quando a falha acaba: são 2.008 alarmes falsos. Os modelos aprenderam a reconhecer falhas que vão passar (um pico com jitter alto e sem repetição) e cortaram esses alarmes para 446 a 650. Em troca, perdem mais falhas que continuam (2.763 a 2.903, contra 1.990) e reconhecem menos RISCO.</li>
+</ul>
+<figure>
+  <img src="img/matrizes_confusao.png" alt="Quatro matrizes de confusão. Árvore: dos casos FALHA, 6803 previstos como FALHA e 2713 como OK; 513 OK previstos como FALHA. Random Forest: 6678 FALHA certos, 2835 previstos como OK, 347 OK como FALHA. XGBoost: 6663, 2841 e 345. Persistência: 7576 FALHA certos, 1764 previstos como OK, 1691 OK previstos como FALHA">
+  <figcaption>Figura 7. Matrizes de confusão no teste. Linhas: classe verdadeira daqui a 12 minutos; colunas: classe prevista.</figcaption>
+</figure>
+<figure>
+  <img src="img/metricas_teste.png" alt="Barras de F1 macro, recall de FALHA, precisão de FALHA, recall de RISCO e recall de início de FALHA para os três modelos e a persistência; o recall de início de FALHA fica perto de zero para todos">
+  <figcaption>Figura 8. Métricas no teste. As barras de início de FALHA quase não aparecem: ficam perto de zero para todos.</figcaption>
+</figure>
+
+<h3 id="geografia">Os modelos aprenderam geografia?</h3>
+<p>Separamos os fluxos em três grupos pelo RTT normal: <strong>curtos</strong> (1 a 42 ms, 31 fluxos), <strong>regionais</strong> (43 a 107 ms, 30) e <strong>longos</strong> (108 a 315 ms, 31). Esse grupo nunca entrou nos modelos; serve só para analisar os erros.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Tipo de caminho</th><th>Árvore de Decisão</th><th>Random Forest</th><th>XGBoost</th><th>Persistência</th><th>Nº no teste</th></tr></thead>
+  <tbody>
+    <tr><td>Curto</td><td>0,529</td><td>0,540</td><td>0,541</td><td class="best">0,575</td><td>22.682</td></tr>
+    <tr><td>Regional</td><td>0,628</td><td>0,621</td><td>0,628</td><td class="best">0,677</td><td>22.028</td></tr>
+    <tr><td>Longo</td><td>0,849</td><td>0,852</td><td class="best">0,854</td><td>0,852</td><td>21.992</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">Tabela 5. F1 macro no teste por tipo de caminho.</p>
+<p>Os caminhos longos são os <strong>mais fáceis</strong> para todos, inclusive para a persistência: eles são estáveis em relação ao próprio normal. Os curtos são os mais difíceis, porque variações de frações de milissegundo já parecem desvios grandes. Nenhum modelo trata caminho longo como problema, o que confirma que os atributos relativos funcionaram. Mas, dentro de cada grupo, os modelos ficam empatados com a persistência ou abaixo dela: o pequeno ganho geral vem da mistura dos grupos, e não de uma vantagem clara em algum deles.</p>
+<figure>
+  <img src="img/f1_por_escopo.png" alt="Barras de F1 macro por tipo de caminho. Curto: modelos perto de 0,53 a 0,54 e persistência 0,575. Regional: modelos perto de 0,62 a 0,63 e persistência 0,677. Longo: todos perto de 0,85">
+  <figcaption>Figura 9. F1 macro por tipo de caminho.</figcaption>
+</figure>
+
+<h3 id="interpretabilidade">Dá para auditar?</h3>
+<p>A melhor árvore tem <strong>profundidade 4 e 16 folhas</strong>, pequena o bastante para caber numa página e ser lida inteira (está em <a href="https://github.com/iedahirari/artigo-preditor-redes/blob/main/resultados/arvore_escolhida.txt"><code>resultados/arvore_escolhida.txt</code></a>). Cada previsão tem uma <strong>explicação exata</strong>: no máximo 4 perguntas do tipo "<code>z_robusto</code> ≤ 3,41?". Random Forest e XGBoost não oferecem isso, já que cada decisão é a votação ou a soma de centenas de árvores. O que eles mostram é a <strong>importância global</strong> de cada atributo; para explicar uma previsão específica seria preciso uma ferramenta extra, como o SHAP<sup><a href="#ref-10">[10]</a></sup>.</p>
+<figure>
+  <img src="img/importancia_atributos.png" alt="Importância dos atributos em cada modelo. Árvore: z_robusto cerca de 0,52, n5_risco 0,39, jitter_relativo 0,09. Random Forest: z_robusto 0,43, n5_risco 0,25, aumento_pct 0,20. XGBoost: n5_risco 0,42, z_robusto 0,26, aumento_pct 0,12">
+  <figcaption>Figura 10. Importância dos atributos em cada modelo.</figcaption>
+</figure>
+<p>As importâncias fazem sentido para quem trabalha com redes. Os três modelos se apoiam em <code>z_robusto</code> (o quanto o RTT está longe do normal agora) e em <code>n5_risco</code> (se os desvios estão se repetindo). A árvore usa praticamente só esses dois e o <code>jitter_relativo</code>; os ensembles distribuem um pouco do peso para <code>aumento_pct</code>. A perda de pacotes quase não pesa: com 3 pacotes por medição, ela é rara e, quando aparece, costuma durar pouco.</p>
+
+<h2 id="literatura">O que outros trabalhos encontraram</h2>
+<p>A professora Andréa Ono Sakai publicou um exemplo do mesmo tipo de problema<sup><a href="#ref-8">[8]</a></sup>, também com pings do RIPE Atlas, mas com outra regra de rótulo (percentis do próprio fluxo) e outro horizonte: a <strong>próxima</strong> medição, cerca de 4 minutos à frente. Lá, uma Random Forest com 21 atributos, incluindo janelas de 3, 6 e 12 medições, chegou a F1 macro de 0,755 no teste, contra 0,711 da persistência, e anunciou 14,6% dos inícios de FALHA (66 de 452).</p>
+<p>A comparação ajuda a ler o nosso resultado. Com atributos de janela mais longa e um horizonte mais curto, um modelo consegue algum ganho sobre a persistência nos inícios de falha. Com os nossos 8 atributos e 12 minutos de antecedência, esse ganho desaparece. O próprio RFC do nosso projeto prevê isso: <em>"sem ganho sobre a persistência, a entrega declara o sistema como detector"</em>.</p>
+<p>Em estudos de detecção de intrusão, a escolha entre Random Forest e XGBoost também varia com os dados e o ajuste, sem um vencedor universal<sup><a href="#ref-9">[9]</a></sup><sup><a href="#ref-11">[11]</a></sup>. Em outro artigo do grupo, com o NSL-KDD<sup><a href="#ref-16">[16]</a></sup>, a árvore teve o maior recall. Aqui os três empataram. A lição se repete: <strong>o vencedor depende do problema, dos atributos e da régua de comparação</strong>.</p>
+
+<h2 id="recomendacao">Recomendação</h2>
+<div class="callout">
+  <p><strong>Escolhemos a Árvore de Decisão</strong>, mas como <strong>detector com previsão de curto prazo</strong>, e não como um preditor que antecipa falhas. Ela ficou a 0,006 de F1 macro do XGBoost (0,759 contra 0,765), é a mais rápida (0,56 ms por medição) e é a única que um operador consegue ler inteira: 16 folhas, no máximo 4 perguntas.</p>
+  <p>Nenhum dos três modelos antecipa o início de uma FALHA 12 minutos antes. O que eles fazem melhor que a persistência é perceber quando uma falha vai acabar, cortando de 2.008 para 446 a 650 os alarmes falsos de FALHA.</p>
+</div>
+
+<p>Respondendo às perguntas que guiaram a escolha:</p>
+<ol class="qa">
+  <li>
+    <strong>Algum modelo vence a persistência?</strong>
+    Por pouco. O XGBoost tem o maior F1 macro (0,765), e a persistência fica em 0,753. A diferença entre os três modelos (de 0,759 a 0,765) é menor que a incerteza de uma única execução. Nos inícios de FALHA, ninguém vence: todos ficam perto de zero.
+  </li>
+  <li>
+    <strong>Qual modelo perde menos falhas, e com quantos alarmes falsos?</strong>
+    Entre os modelos, a árvore tem o maior recall de FALHA (0,711, ou 2.763 falhas perdidas), com 650 alarmes falsos. Random Forest e XGBoost perdem cerca de 130 falhas a mais e geram cerca de 200 alarmes falsos a menos. A persistência perde menos falhas (1.990), mas gera 2.008 alarmes falsos, quatro vezes mais que os ensembles.
+  </li>
+  <li>
+    <strong>A latência serve para um monitor?</strong>
+    Sim, para os três. As medições chegam a cada 240 segundos, e o modelo mais lento (Random Forest, 15,7 ms) responde mais de 15 mil vezes mais rápido que isso. A latência só pesaria num monitor com milhares de fluxos e pouco processamento; aí a árvore (0,56 ms) seria a escolha natural.
+  </li>
+  <li>
+    <strong>Qual modelo um operador consegue auditar?</strong>
+    Só a árvore permite mostrar o caminho exato de cada alerta, por exemplo "o RTT está a mais de 3,4 desvios do normal e o jitter não está alto, então a falha deve continuar". Nos ensembles, o operador vê apenas a importância global dos atributos.
+  </li>
+  <li>
+    <strong>O resultado muda entre caminhos curtos e longos?</strong>
+    Muda, e da mesma forma para todos: os longos são os mais fáceis, e os curtos os mais difíceis. Nenhum modelo trata caminho longo como problema. Nos caminhos curtos e regionais, a persistência é ligeiramente melhor que os três modelos.
+  </li>
+  <li>
+    <strong>O que mudaria a escolha?</strong>
+    Se o objetivo fosse <strong>reduzir a fadiga de alertas</strong>, escolheríamos a Random Forest ou o XGBoost: 446 alarmes falsos de FALHA, contra 650 da árvore. Se quiséssemos de fato <strong>antecipar falhas</strong>, nenhum dos três resolveria com estes atributos. Seria preciso acrescentar tendências de janelas mais longas, como no trabalho de referência, e talvez encurtar o horizonte. Esse é o próximo experimento que faríamos.
+  </li>
+</ol>
+
+<h2 id="limitacoes">Limitações</h2>
+<ul>
+  <li><strong>O rótulo é uma política, não um defeito confirmado.</strong> A classe vem de uma regra sobre o desvio em relação ao normal, e não de registros de falha de roteadores. Os modelos aprendem a prever essa regra.</li>
+  <li><strong>Uma semente, uma divisão.</strong> Os números vêm de uma execução só. A diferença entre os três modelos (0,006 de F1 macro) é pequena demais para ser declarada com segurança; repetir com várias sementes e vários cortes daria intervalos de confiança.</li>
+  <li><strong>Atributos de janela curta.</strong> Os modelos só veem a medição de agora e contagens das últimas 5. Falhas que começam sem aviso nessas 5 medições não têm como ser antecipadas.</li>
+  <li><strong>Mudança de rota.</strong> Quando um caminho muda de patamar e fica estável (por exemplo, de 7 ms para 13 ms), a regra do projeto marca FALHA o tempo todo, porque o normal foi calculado na semana anterior. Isso infla a persistência das falhas.</li>
+  <li><strong>Período curto.</strong> Uma semana de rótulos, dividida em treino, validação e teste. Os blocos podem ter comportamentos diferentes (a validação tem mais FALHA que o treino).</li>
+  <li><strong>Anchors não são a rede do campus.</strong> Os servidores do RIPE Atlas ficam em datacenters bem conectados. Uma rede local, com Wi-Fi e enlaces mais fracos, pode se comportar de outro jeito.</li>
+</ul>
+
+<h3>Como reproduzir</h3>
+<p>Com Python 3 instalado, clone o <a href="https://github.com/iedahirari/artigo-preditor-redes">repositório</a> e rode:</p>
+<pre><code class="language-bash">python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+jupyter notebook</code></pre>
+<p>Rode <code>notebooks/01_preparacao_dados.ipynb</code> (ele baixa os dados do repositório do projeto integrador e remove os IPs) e depois <code>notebooks/02_modelos.ipynb</code>. Com a semente 42 as métricas saem iguais. As métricas completas ficam em <a href="https://github.com/iedahirari/artigo-preditor-redes/tree/main/resultados"><code>resultados/</code></a>.</p>
+
+<h2 id="observacao">Quadro de observação</h2>
+<p>Como pedido na atividade, observamos duas referências da lista sugerida antes de escrever, e registramos as decisões que tomamos a partir delas.</p>
+<div class="table-wrap">
+<table class="wide">
+  <thead><tr><th>Referência observada</th><th>O que funciona nela</th><th>O que levamos para o nosso artigo</th></tr></thead>
+  <tbody>
+    <tr><td>DataCamp: aprendizado em conjunto em Python<sup><a href="#ref-11">[11]</a></sup></td><td>Explica bagging e boosting lado a lado, com código curto rodando num conjunto de dados real</td><td>A Figura 3 (bagging × boosting) e os trechos de código curtos, com os hiperparâmetros vencedores</td></tr>
+    <tr><td>Qwak/JFrog: XGBoost versus Random Forest<sup><a href="#ref-9">[9]</a></sup></td><td>Parte da árvore simples e só depois chega aos ensembles; termina dizendo que não há vencedor universal</td><td>A ordem do artigo (árvore pequena antes da teoria) e a seção de literatura sem "o XGBoost é sempre o melhor"</td></tr>
+  </tbody>
+</table>
+</div>
+<p><strong>Três decisões do grupo:</strong></p>
+<ol>
+  <li><strong>Vamos comparar com a persistência</strong> porque, sem essa régua, um F1 macro de 0,76 parece bom, mas repetir o estado de agora já dá 0,75.</li>
+  <li><strong>Vamos dividir no tempo, e não por sorteio</strong>, porque medições vizinhas do mesmo fluxo são quase iguais, e o sorteio colocaria praticamente a mesma medição no treino e no teste.</li>
+  <li><strong>Vamos remover os IPs antes de salvar qualquer arquivo</strong>, porque a atividade proíbe publicar endereços IP reais, e os fluxos podem ser identificados por um código.</li>
+</ol>
+<p><strong>O que decidimos não fazer:</strong> não usamos o RTT em milissegundos, o país nem o destino como atributos. Eles provavelmente subiriam o acerto em algum caso, mas ensinariam ao modelo que "caminho longo = problema", que é o erro que o projeto inteiro tenta evitar.</p>
+
+<h2 id="links">Para ler mais</h2>
+<ul class="links">
+  <li><a href="https://xgboost.readthedocs.io/en/stable/tutorials/model.html">Introduction to Boosted Trees</a> (documentação do XGBoost): a explicação oficial e mais organizada de como o XGBoost monta e escolhe cada árvore.</li>
+  <li><a href="https://scikit-learn.org/stable/modules/tree.html">Decision Trees</a> (documentação do scikit-learn): critérios de divisão, poda e as dicas práticas para árvores.</li>
+  <li><a href="https://www.datacamp.com/pt/tutorial/ensemble-learning-python-guide">Aprendizado em conjunto em Python: Random Forest e XGBoost</a> (DataCamp, em português): bagging contra boosting com código num conjunto de dados real.</li>
+  <li><a href="https://www.qwak.com/post/xgboost-versus-random-forest">XGBoost versus Random Forest</a> (Qwak/JFrog): vai da árvore simples ao confronto entre bagging e boosting, com ilustrações.</li>
+  <li><a href="https://www.digitalocean.com/community/tutorials/xgboost-guide-shap-analysis-code-demo">From Code to Clarity: XGBoost with SHAP</a> (DigitalOcean): como explicar previsões individuais de um XGBoost.</li>
+  <li><a href="https://atlas.ripe.net/docs/apis/rest-api-manual/">Manual da API do RIPE Atlas</a>: de onde vêm as medições de ping usadas aqui e como consultá-las.</li>
+</ul>
+
+<h2 id="referencias">Referências</h2>
+<ol class="refs">
+  <li id="ref-1">Breiman, L. (2001). Random Forests. <em>Machine Learning</em>, 45(1), 5–32. <a href="https://doi.org/10.1023/A:1010933404324">doi:10.1023/A:1010933404324</a></li>
+  <li id="ref-2">Chen, T.; Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. <em>Proceedings of the 22nd ACM SIGKDD</em>, 785–794. <a href="https://arxiv.org/abs/1603.02754">arXiv:1603.02754</a></li>
+  <li id="ref-3">Friedman, J. H. (2001). Greedy Function Approximation: A Gradient Boosting Machine. <em>The Annals of Statistics</em>, 29(5), 1189–1232.</li>
+  <li id="ref-4">RIPE NCC. RIPE Atlas Service Terms and Conditions. <a href="https://www.ripe.net/about-us/legal/ripe-atlas-service-terms-and-conditions/">ripe.net</a></li>
+  <li id="ref-5">XGBoost Developers. Introduction to Boosted Trees. Documentação oficial do XGBoost. <a href="https://xgboost.readthedocs.io/en/stable/tutorials/model.html">xgboost.readthedocs.io</a></li>
+  <li id="ref-6">Pedregosa, F. et al. (2011). Scikit-learn: Machine Learning in Python. <em>Journal of Machine Learning Research</em>, 12, 2825–2830. Documentação: <a href="https://scikit-learn.org/stable/modules/tree.html">scikit-learn.org</a></li>
+  <li id="ref-7">RIPE NCC. RIPE Atlas: REST API Manual. <a href="https://atlas.ripe.net/docs/apis/rest-api-manual/">atlas.ripe.net</a></li>
+  <li id="ref-8">Sakai, A. O. (2026). Preditor de Qualidade de Redes com Machine Learning. <a href="https://github.com/andreaono/preditor_redes">github.com/andreaono/preditor_redes</a></li>
+  <li id="ref-9">Lev, A. (2022). XGBoost versus Random Forest. Qwak/JFrog ML. <a href="https://www.qwak.com/post/xgboost-versus-random-forest">qwak.com</a></li>
+  <li id="ref-10">Mukherjee, S. (2025). From Code to Clarity: XGBoost with SHAP Explained. DigitalOcean. <a href="https://www.digitalocean.com/community/tutorials/xgboost-guide-shap-analysis-code-demo">digitalocean.com</a></li>
+  <li id="ref-11">DataCamp (2026). Aprendizado em conjunto em Python: um guia prático para Random Forest e XGBoost. <a href="https://www.datacamp.com/pt/tutorial/ensemble-learning-python-guide">datacamp.com</a></li>
+  <li id="ref-12">Van Otten, N. (2023). Gradient Boosting Explained &amp; How To Tutorials In Python With XGBoost. Spot Intelligence. <a href="https://spotintelligence.com/2023/08/18/gradient-boosting-explained-how-to-tutorials-in-python-with-xgboost/">spotintelligence.com</a></li>
+  <li id="ref-13">DZone. A Deep Dive into XGBoost With Code and Explanation. <a href="https://dzone.com/articles/xgboost-deep-dive">dzone.com</a></li>
+  <li id="ref-14">Grupo WebAgriculture (2026). Projeto integrador: preditor de degradação de rede com RTT normalizado. <a href="https://github.com/ZorahSai/Projeto-WebAgriculture-">github.com/ZorahSai/Projeto-WebAgriculture-</a></li>
+  <li id="ref-15">Leys, C.; Ley, C.; Klein, O.; Bernard, P.; Licata, L. (2013). Detecting outliers: Do not use standard deviation around the mean, use absolute deviation around the median. <em>Journal of Experimental Social Psychology</em>, 49(4), 764–766.</li>
+  <li id="ref-16">Grupo WebAgriculture (2026). Árvore, floresta ou boosting? Escolhendo um detector de intrusão no NSL-KDD. <a href="https://iedahirari.github.io/Artigo/">iedahirari.github.io/Artigo</a></li>
+</ol>
+
+<h2 id="autores">Autores</h2>
+<!-- AUTORES: um cartão por integrante. Publicar só o que cada um autorizou (LGPD). Sem telefone, e-mail pessoal ou endereço. -->
+<!-- Falta: mini-bio (curso, semestre, área de interesse) e LinkedIn de cada integrante. Publicar só o que cada um autorizou (LGPD). -->
+<div class="authors">
+  <div class="author">
+    <span class="author-photo" aria-hidden="true">AS<img onerror="this.remove()" src="img/autores/apollomoura.jpg" alt=""></span>
+    <b>Apollo Moura De Sousa</b>
+    <a href="https://github.com/apollomoura">@apollomoura</a>
+  </div>
+  <div class="author">
+    <span class="author-photo" aria-hidden="true">IS<img onerror="this.remove()" src="img/autores/clicaro.jpg" alt=""></span>
+    <b>Icaro Luiz Dellalo Silva</b>
+    <a href="https://github.com/clicaro">@clicaro</a>
+  </div>
+  <div class="author">
+    <span class="author-photo" aria-hidden="true">IO<img onerror="this.remove()" src="img/autores/iedahirari.jpg" alt=""></span>
+    <b>Ieda de Oliveira</b>
+    <a href="https://github.com/iedahirari">@iedahirari</a>
+  </div>
+  <div class="author">
+    <span class="author-photo" aria-hidden="true">JM<img onerror="this.remove()" src="img/autores/zorahsai.jpg" alt=""></span>
+    <b>João Pedro C. de Morais</b>
+    <a href="https://github.com/ZorahSai">@ZorahSai</a>
+  </div>
+  <div class="author">
+    <span class="author-photo" aria-hidden="true">LG<img onerror="this.remove()" src="img/autores/superlucas2000.jpg" alt=""></span>
+    <b>Lucas Matteus Baptista de Godoy</b>
+    <a href="https://github.com/SuperLucas2000">@SuperLucas2000</a>
+  </div>
+</div>
+
+<footer>
+  <p>Texto e figuras sob licença <a href="https://creativecommons.org/licenses/by/4.0/deed.pt-br">CC BY 4.0</a>; código sob licença MIT. As figuras foram geradas pelos autores a partir dos notebooks. Dados: <a href="https://atlas.ripe.net/">RIPE Atlas</a> (RIPE NCC), usados para pesquisa conforme os termos de serviço<sup><a href="#ref-4">[4]</a></sup>.</p>
+  <p>Contato e correções: <a href="https://github.com/iedahirari/artigo-preditor-redes/issues">abra uma issue no repositório</a>. Código: <a href="https://github.com/iedahirari/artigo-preditor-redes">github.com/iedahirari/artigo-preditor-redes</a>.</p>
+  <p>Última revisão: <time datetime="2026-10-18">18 de outubro de 2026</time>.</p>
+</footer>
+
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>
