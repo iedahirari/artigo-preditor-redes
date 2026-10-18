@@ -43,6 +43,14 @@ Com a semente 42 as métricas saem iguais. Os tempos (treino, predição e latê
 
 Os dados seguem os [RIPE Atlas Terms and Conditions](https://www.ripe.net/about-us/legal/ripe-atlas-service-terms-and-conditions/): uso para pesquisa é permitido, com crédito ao RIPE NCC.
 
+## Acessibilidade e responsividade da página
+
+- Layout de uma coluna que se adapta de 320 px (celular) a telas largas, sem rolagem lateral. Testado em 375 px (celular), 768 px (tablet) e 1440 px (desktop), nos temas claro e escuro.
+- Figuras largas (árvore, matrizes de confusão, importâncias, métricas) deslizam para o lado no celular e abrem em tamanho original com um toque. Tabelas largas rolam dentro da própria caixa, com sombra indicando que há mais conteúdo.
+- Link "Pular para o conteúdo", foco visível no teclado, alvos de toque de pelo menos 44 px nos menus e botões, textos alternativos em todas as figuras e respeito a "reduzir movimento".
+- Escrita para funcionar em Chrome, Edge, Firefox e Safari, inclusive no iPhone (os testes acima foram feitos num navegador baseado em Chromium): as faixas de largura total não usam `100vw`, há alternativa para navegadores sem `overflow: clip`, e o texto não é ampliado sozinho no iPhone.
+- Imagens com largura e altura declaradas e carregamento sob demanda; fontes Roboto e Roboto Mono do Google Fonts; ícone, cor da barra do navegador e prévia para compartilhamento (Open Graph).
+
 ## Resultados no teste (classe daqui a 12 minutos)
 
 | Modelo | F1 macro | Recall de FALHA | Precisão de FALHA | Alarmes falsos de FALHA | Recall de início de FALHA |
@@ -56,9 +64,9 @@ Os três modelos ficam pouco acima da persistência e nenhum antecipa o início 
 
 ## Autores
 
-- Apollo Moura De Sousa ([@apollomoura](https://github.com/apollomoura))
+- Apollo Moura De Sousa ([@apollomoura](https://github.com/apollomoura) · [LinkedIn](https://www.linkedin.com/in/apollo-moura-215306320/))
 - Icaro Luiz Dellalo Silva ([@clicaro](https://github.com/clicaro))
-- Ieda de Oliveira ([@iedahirari](https://github.com/iedahirari))
+- Ieda de Oliveira ([@iedahirari](https://github.com/iedahirari) · [LinkedIn](https://www.linkedin.com/in/ieda-oliveira/))
 - João Pedro C. de Morais ([@ZorahSai](https://github.com/ZorahSai))
 - Lucas Matteus Baptista de Godoy ([@SuperLucas2000](https://github.com/SuperLucas2000))
 

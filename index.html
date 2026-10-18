@@ -2,12 +2,25 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#630000" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1717" media="(prefers-color-scheme: dark)">
 <title>Preditor de degradação de rede</title>
 <meta name="description" content="Árvore de Decisão, Random Forest e XGBoost explicados e comparados na previsão do estado de caminhos da internet 12 minutos à frente, com dados públicos do RIPE Atlas e a persistência como régua.">
+<link rel="canonical" href="https://iedahirari.github.io/artigo-preditor-redes/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23630000'/%3E%3Ccircle cx='32' cy='32' r='14' fill='%23810100' stroke='%23EDEBDD' stroke-width='5'/%3E%3C/svg%3E">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Árvore, floresta ou boosting? Prevendo a degradação de uma rede 12 minutos antes">
+<meta property="og:description" content="Árvore de Decisão, Random Forest e XGBoost explicados e comparados na previsão do estado de caminhos da internet 12 minutos à frente, com dados públicos do RIPE Atlas e a persistência como régua.">
+<meta property="og:url" content="https://iedahirari.github.io/artigo-preditor-redes/">
+<meta property="og:image" content="https://iedahirari.github.io/artigo-preditor-redes/img/matrizes_confusao.png">
+<meta property="og:image:alt" content="Matrizes de confusão da Árvore de Decisão, Random Forest, XGBoost e persistência no teste">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400..700;1,400..700&family=Roboto+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
 <style>
@@ -59,32 +72,45 @@
   }
 
   * { box-sizing: border-box; }
-  html { scroll-padding-top: 64px; }
+  html { scroll-padding-top: 64px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  /* Navegadores sem overflow: clip (Safari < 16): corta a sobra lateral no html, sem quebrar o cabeçalho fixo */
+  @supports not (overflow: clip) { html { overflow-x: hidden; } }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 17px/1.7 "Source Serif 4", Georgia, "Times New Roman", serif;
+    font: 17px/1.7 "Roboto", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
     overflow-x: clip;
   }
   h1, h2, h3, .kicker, table, figcaption, .stats, nav, footer, .site-header, .meta, .author, details summary, .refs {
-    font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: "Roboto", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   }
   ::selection { background: var(--cherry); color: var(--cotton); }
+  img { max-width: 100%; }
+
+  /* Foco visível para quem navega pelo teclado */
+  a:focus-visible, summary:focus-visible, .table-wrap:focus-visible, .fig-scroll:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  .site-header a:focus-visible, footer a:focus-visible, .callout a:focus-visible { outline-color: var(--cotton); }
+  .skip { position: absolute; left: 12px; top: -120px; z-index: 100; padding: 12px 18px; border-radius: 4px; background: var(--cherry); color: var(--cotton); font: 700 15px "Roboto", system-ui, Arial, sans-serif; text-decoration: none; }
+  .skip:focus { top: 12px; }
+  main:focus { outline: none; }
 
   .site-header { position: sticky; top: 0; z-index: 10; background: var(--noir); border-bottom: 3px solid var(--cherry); }
   .site-header .inner { max-width: 1080px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 52px; }
-  .site-header .brand { font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--cotton); text-decoration: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+  .site-header .brand { font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--cotton); text-decoration: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; min-height: 44px; }
   .site-header .brand::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--cherry); box-shadow: 0 0 0 2px var(--cotton); }
   .site-header nav { display: flex; gap: 18px; overflow-x: auto; font-size: 14px; scrollbar-width: none; }
   .site-header nav::-webkit-scrollbar { display: none; }
-  .site-header nav a { color: #c9c3b5; text-decoration: none; white-space: nowrap; }
+  .site-header nav a { color: #c9c3b5; text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; }
   .site-header nav a:hover { color: var(--cotton); text-decoration: underline; text-decoration-color: var(--cherry); text-underline-offset: 6px; text-decoration-thickness: 2px; }
 
   main { max-width: 760px; margin: 0 auto; padding: 0 16px 80px; }
 
-  .hero { margin: 0 calc(50% - 50vw) 32px; padding: 56px calc(50vw - 50% + 0px) 40px; background: var(--maroon); color: var(--cotton); position: relative; }
-  .hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--cherry); }
+  /* Faixas de ponta a ponta sem 100vw: a sombra pinta as laterais e o clip-path limita a altura (não cria rolagem lateral) */
+  .hero { margin: 0 0 32px; padding: 56px 0 40px; background: var(--maroon); color: var(--cotton); position: relative;
+    box-shadow: 0 0 0 100vmax var(--maroon); -webkit-clip-path: inset(0 -100vmax); clip-path: inset(0 -100vmax); }
+  .hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--cherry);
+    box-shadow: 0 0 0 100vmax var(--cherry); -webkit-clip-path: inset(0 -100vmax); clip-path: inset(0 -100vmax); }
   .hero .kicker { color: #f0b7ae; }
   .hero .lede { color: #e6d9cf; }
   .hero .meta { color: #e6d9cf; }
@@ -100,22 +126,23 @@
   .lede { font-size: 19px; color: var(--muted); margin: 0 0 20px; }
   a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
   a:hover { text-decoration-thickness: 2px; }
-  code { font-family: ui-monospace, Consolas, monospace; font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  code { font-family: "Roboto Mono", ui-monospace, Consolas, monospace; font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
   pre { margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
   pre code, pre code.hljs { display: block; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; background: var(--code-bg); border-radius: 10px; }
-  sup a { text-decoration: none; font-family: "Space Grotesk", system-ui, sans-serif; font-size: 12px; }
+  sup a { text-decoration: none; font-family: "Roboto", system-ui, Arial, sans-serif; font-size: 12px; padding: 8px 3px; margin: -8px -1px; }
 
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; font-size: 14px; color: var(--muted); margin: 0 0 8px; }
   .byline { display: flex; flex-wrap: wrap; gap: 8px 16px; }
   .byline span { display: inline-flex; align-items: center; gap: 8px; color: var(--text); }
-  .avatar, .author-photo { position: relative; flex: none; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--cherry); color: var(--cotton); font: 700 12px "Space Grotesk", system-ui, sans-serif; letter-spacing: .04em; }
+  .avatar, .author-photo { position: relative; flex: none; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--cherry); color: var(--cotton); font: 700 12px "Roboto", system-ui, Arial, sans-serif; letter-spacing: .04em; }
   .avatar { width: 30px; height: 30px; }
   .avatar img, .author-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
-  .toc { margin: 24px 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-family: "Space Grotesk", system-ui, sans-serif; font-size: 15px; }
+  .toc { margin: 24px 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-family: "Roboto", system-ui, Arial, sans-serif; font-size: 15px; }
   .toc strong { display: block; margin-bottom: 6px; }
   .toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 24px; }
-  .toc a { color: var(--text); text-decoration: none; }
+  .toc li { break-inside: avoid; }
+  .toc a { color: var(--text); text-decoration: none; display: inline-block; padding: 5px 0; }
   .toc a:hover { color: var(--accent); }
   @media (max-width: 520px) { .toc ol { columns: 1; } }
 
@@ -124,7 +151,14 @@
   .stat b { display: block; font-size: 28px; line-height: 1.2; color: var(--accent); letter-spacing: -.01em; margin-bottom: 6px; }
   .stat span { display: block; font-size: 13px; line-height: 1.45; color: var(--muted); }
 
-  .table-wrap { overflow-x: auto; margin: 16px 0 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 16px 0 8px; border: 1px solid var(--border); border-radius: 10px;
+    /* sombra nas bordas quando há mais tabela para o lado (some quando chega ao fim) */
+    background:
+      linear-gradient(to right, var(--surface) 30%, transparent) left center / 32px 100% no-repeat local,
+      linear-gradient(to left, var(--surface) 30%, transparent) right center / 32px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, .22), transparent) left center / 14px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, .22), transparent) right center / 14px 100% no-repeat scroll,
+      var(--surface); }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
   th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; font-variant-numeric: tabular-nums; vertical-align: top; }
   th:first-child, td:first-child { text-align: left; }
@@ -133,20 +167,23 @@
   td.best { color: var(--good); font-weight: 700; }
   table.wide th, table.wide td { white-space: normal; text-align: left; min-width: 150px; line-height: 1.45; }
   table.wide th:first-child, table.wide td:first-child { min-width: 120px; font-weight: 600; }
-  .note { font-size: 14px; color: var(--muted); font-family: "Space Grotesk", system-ui, sans-serif; }
+  .note { font-size: 14px; color: var(--muted); font-family: "Roboto", system-ui, Arial, sans-serif; }
 
   figure { margin: 28px 0; }
   figure img { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 4px; background: var(--img-bg); }
+  .zoom { display: block; cursor: zoom-in; }
+  .fig-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .fig-hint { display: none; font-size: 13px; color: var(--muted); margin: 6px 0 0; font-family: "Roboto", system-ui, Arial, sans-serif; }
   figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
   figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
-  .dg-text { fill: var(--text); font: 15px "Space Grotesk", system-ui, sans-serif; }
-  .dg-small { fill: var(--muted); font: 13px "Space Grotesk", system-ui, sans-serif; }
-  .dg-title { font: 600 16px "Space Grotesk", system-ui, sans-serif; }
+  .dg-text { fill: var(--text); font: 15px "Roboto", system-ui, Arial, sans-serif; }
+  .dg-small { fill: var(--muted); font: 13px "Roboto", system-ui, Arial, sans-serif; }
+  .dg-title { font: 600 16px "Roboto", system-ui, Arial, sans-serif; }
 
-  .model-tag { display: inline-block; font: 700 12px "Space Grotesk", system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; border: 1.5px solid currentColor; margin-bottom: 6px; }
+  .model-tag { display: inline-block; font: 700 12px "Roboto", system-ui, Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; border: 1.5px solid currentColor; margin-bottom: 6px; }
   .tree-c { color: var(--tree); } .forest-c { color: var(--forest); } .boost-c { color: var(--boost); }
   dl.concepts { margin: 12px 0; }
-  dl.concepts dt { font-weight: 700; font-family: "Space Grotesk", system-ui, sans-serif; font-size: 15px; margin-top: 10px; }
+  dl.concepts dt { font-weight: 700; font-family: "Roboto", system-ui, Arial, sans-serif; font-size: 15px; margin-top: 10px; }
   dl.concepts dd { margin: 2px 0 0; }
 
   details.deep { margin: 20px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
@@ -160,12 +197,12 @@
   .callout p + p { margin-top: 10px; }
   ol.qa { padding-left: 22px; }
   ol.qa > li { margin-bottom: 18px; }
-  ol.qa > li > strong { font-family: "Space Grotesk", system-ui, sans-serif; display: block; margin-bottom: 2px; }
+  ol.qa > li > strong { font-family: "Roboto", system-ui, Arial, sans-serif; display: block; margin-bottom: 2px; }
 
   ul.links { padding-left: 20px; }
-  ul.links li { margin-bottom: 8px; }
+  ul.links li { margin-bottom: 12px; }
   ol.refs { font-size: 15px; padding-left: 28px; line-height: 1.55; }
-  ol.refs li { margin-bottom: 8px; }
+  ol.refs li { margin-bottom: 10px; overflow-wrap: anywhere; }
   ol.refs li:target { background: var(--accent-soft); }
 
   .authors { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
@@ -174,9 +211,21 @@
   .author b { font-size: 16px; line-height: 1.3; }
   .author p { margin: 0; color: var(--muted); }
   .author a { font-size: 14px; }
+  .author .bio { font-size: 13px; line-height: 1.45; }
+  .author-links { display: flex; gap: 8px; margin-top: 4px; }
+  .icon-link { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); background: transparent; transition: background-color .15s, color .15s, border-color .15s; }
+  .icon-link svg { width: 17px; height: 17px; fill: currentColor; }
+  .icon-link:hover, .icon-link:focus-visible { background: var(--cherry); border-color: var(--cherry); color: var(--cotton); }
+  .icon-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .icon-link { transition: none; } }
 
-  footer { font-size: 13px; color: #c9c3b5; background: var(--noir); margin: 72px calc(50% - 50vw) -80px; padding: 28px calc(50vw - 50%) 36px; border-top: 6px solid var(--cherry); }
+  footer { position: relative; font-size: 13px; color: #c9c3b5; background: var(--noir); margin: 78px 0 -80px; padding: 28px 0 36px;
+    box-shadow: 0 0 0 100vmax var(--noir); -webkit-clip-path: inset(-6px -100vmax 0); clip-path: inset(-6px -100vmax 0); }
+  footer::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 6px; background: var(--cherry);
+    box-shadow: 0 0 0 100vmax var(--cherry); -webkit-clip-path: inset(0 -100vmax); clip-path: inset(0 -100vmax); }
   footer p { margin: 4px 0; }
+  footer { padding-bottom: max(36px, env(safe-area-inset-bottom)); }
+  .topo { display: inline-block; margin-top: 10px; padding: 8px 0; font-weight: 600; }
 
   .diagram { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -194,7 +243,7 @@
     .site-header .brand { font-size: 12px; letter-spacing: .08em; }
     .site-header nav { gap: 14px; font-size: 13px; }
     .hero { padding-top: 36px; padding-bottom: 32px; margin-bottom: 24px; }
-    .hero .kicker { font-size: 11px; letter-spacing: .12em; }
+    .hero .kicker { font-size: 12px; letter-spacing: .12em; }
     .lede { font-size: 17px; }
     .byline { gap: 8px 12px; }
     .byline span { font-size: 13px; }
@@ -203,7 +252,7 @@
     .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
     .stat { padding: 12px; }
     .stat b { font-size: 22px; }
-    .stat span { font-size: 12px; }
+    .stat span { font-size: 13px; }
     .toc { padding: 14px 16px; }
     .toc ol { columns: 1; }
     table { font-size: 13px; }
@@ -219,16 +268,34 @@
     .author-photo { width: 52px; height: 52px; font-size: 17px; }
     .author b { font-size: 14px; }
     .author a { font-size: 13px; word-break: break-all; }
+    .icon-link { width: 44px; height: 44px; }
+    .icon-link svg { width: 19px; height: 19px; }
+    .toc a { padding: 7px 0; }
     footer { margin-top: 56px; }
+  }
+  @media (max-width: 700px) {
+    .fig-scroll img { width: auto; max-width: none; height: 240px; }
+    .fig-hint { display: block; }
   }
   @media (max-width: 360px) {
     .stats, .authors { grid-template-columns: 1fr; }
   }
   footer a { color: var(--cotton); }
   footer sup a { color: #f0b7ae; }
+  @media print {
+    .site-header, .skip, .fig-hint, .topo { display: none !important; }
+    body { background: #fff; color: #000; font-size: 11pt; }
+    .hero, footer, .callout { background: none !important; color: #000 !important; margin: 0 !important; padding: 12px 0 !important; }
+    .hero *, footer *, .callout * { color: #000 !important; }
+    a { color: #000; }
+    figure, table, pre, .author { break-inside: avoid; }
+    details.deep > div { display: block; }
+    .fig-scroll img { width: 100% !important; height: auto !important; }
+  }
 </style>
 </head>
 <body>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
 
 <header class="site-header">
   <div class="inner">
@@ -246,7 +313,7 @@
   </div>
 </header>
 
-<main>
+<main id="conteudo" tabindex="-1">
 
 <section class="hero">
 <p class="kicker">Aprendizado de máquina · Monitoramento de redes</p>
@@ -256,11 +323,11 @@
 <!-- AUTORES em ordem alfabética. Fotos opcionais em img/autores/<usuario-github>.jpg; sem foto, aparecem as iniciais. -->
 <div class="meta">
   <div class="byline">
-    <span><span class="avatar" aria-hidden="true">AS<img onerror="this.remove()" src="img/autores/apollomoura.jpg" alt=""></span>Apollo Moura De Sousa</span>
-    <span><span class="avatar" aria-hidden="true">IS<img onerror="this.remove()" src="img/autores/clicaro.jpg" alt=""></span>Icaro Luiz Dellalo Silva</span>
-    <span><span class="avatar" aria-hidden="true">IO<img onerror="this.remove()" src="img/autores/iedahirari.jpg" alt=""></span>Ieda de Oliveira</span>
-    <span><span class="avatar" aria-hidden="true">JM<img onerror="this.remove()" src="img/autores/zorahsai.jpg" alt=""></span>João Pedro C. de Morais</span>
-    <span><span class="avatar" aria-hidden="true">LG<img onerror="this.remove()" src="img/autores/superlucas2000.jpg" alt=""></span>Lucas Matteus Baptista de Godoy</span>
+    <span><span class="avatar" aria-hidden="true">AS<img onerror="this.remove()" src="img/autores/apollomoura.jpg" width="30" height="30" decoding="async" alt=""></span>Apollo Moura De Sousa</span>
+    <span><span class="avatar" aria-hidden="true">IS<img onerror="this.remove()" src="img/autores/clicaro.jpg" width="30" height="30" decoding="async" alt=""></span>Icaro Luiz Dellalo Silva</span>
+    <span><span class="avatar" aria-hidden="true">IO<img onerror="this.remove()" src="img/autores/iedahirari.jpg" width="30" height="30" decoding="async" alt=""></span>Ieda de Oliveira</span>
+    <span><span class="avatar" aria-hidden="true">JM<img onerror="this.remove()" src="img/autores/zorahsai.jpg" width="30" height="30" decoding="async" alt=""></span>João Pedro C. de Morais</span>
+    <span><span class="avatar" aria-hidden="true">LG<img onerror="this.remove()" src="img/autores/superlucas2000.jpg" width="30" height="30" decoding="async" alt=""></span>Lucas Matteus Baptista de Godoy</span>
   </div>
   <span>Publicado em <time datetime="2026-10-18">18/10/2026</time> · Revisado em <time datetime="2026-10-18">18/10/2026</time></span>
 </div>
@@ -306,7 +373,8 @@
   <li><em>"Se o RTT está a mais de 3,4 desvios, mas o jitter está alto e o desvio não vinha se repetindo, o caminho volta a <strong>OK</strong>."</em> É um pico isolado: ele tende a passar.</li>
 </ul>
 <figure>
-  <img src="img/arvore_profundidade3.png" alt="Diagrama da árvore de decisão de profundidade 3. A raiz pergunta se z_robusto é no máximo 3,43. Do lado verdadeiro, as perguntas são sobre n5_risco e levam a OK ou RISCO. Do lado falso, as perguntas são sobre jitter_relativo, z_robusto e n5_risco e levam a FALHA ou OK">
+  <div class="fig-scroll" tabindex="0" role="region" aria-label="Figura larga, role para o lado"><a class="zoom" href="img/arvore_profundidade3.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/arvore_profundidade3.png" width="3600" height="1200" loading="lazy" decoding="async" alt="Diagrama da árvore de decisão de profundidade 3. A raiz pergunta se z_robusto é no máximo 3,43. Do lado verdadeiro, as perguntas são sobre n5_risco e levam a OK ou RISCO. Do lado falso, as perguntas são sobre jitter_relativo, z_robusto e n5_risco e levam a FALHA ou OK"></a></div>
+  <p class="fig-hint">Deslize para o lado para ver a figura inteira, ou toque nela para ampliar.</p>
   <figcaption>Figura 1. Árvore de profundidade 3 treinada nos nossos dados. Cada caixa é uma pergunta sobre a medição de agora; as folhas dão a classe prevista para daqui a 12 minutos. A borda indica a classe: verde OK, amarelo RISCO, vermelho FALHA.</figcaption>
 </figure>
 
@@ -351,7 +419,7 @@
 </dl>
 <p>Por que isso funciona? A floresta <strong>reduz a variância</strong>: a média de muitas árvores parecidas, mas não iguais, oscila menos que uma árvore só. Vimos isso no experimento. Com 1 árvore, o F1 macro de validação variou entre 0,672 e 0,694 conforme a semente; a partir de 25 árvores, ficou entre 0,70 e 0,72, e com 200 árvores a faixa caiu para 0,713 a 0,717.</p>
 <figure>
-  <img src="img/rf_numero_arvores.png" alt="F1 macro de validação da Random Forest em função do número de árvores, em escala logarítmica, com faixa mínima e máxima entre 3 sementes que se estreita conforme as árvores aumentam">
+  <a class="zoom" href="img/rf_numero_arvores.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/rf_numero_arvores.png" width="1050" height="600" loading="lazy" decoding="async" alt="F1 macro de validação da Random Forest em função do número de árvores, em escala logarítmica, com faixa mínima e máxima entre 3 sementes que se estreita conforme as árvores aumentam"></a>
   <figcaption>Figura 2. Random Forest: número de árvores × F1 macro na validação. A faixa (mínimo e máximo entre 3 sementes) se estreita com mais árvores.</figcaption>
 </figure>
 <details class="deep">
@@ -438,7 +506,7 @@
 </dl>
 <p>Por que isso funciona? O boosting <strong>reduz o viés</strong>: o modelo começa simples demais e, a cada rodada, fica mais capaz de capturar padrões que antes escapavam. O risco é o oposto do da floresta: continuar adicionando árvores até decorar o treino. É para isso que servem a taxa de aprendizado e o early stopping. No nosso experimento, a parada antecipada interrompeu o treino em cerca de 40 rodadas com taxa 0,3, cerca de 120 com taxa 0,1 e 452 com taxa 0,03.</p>
 <figure>
-  <img src="img/xgb_taxa_aprendizado.png" alt="Curvas de log-loss do XGBoost por rodada para taxas de aprendizado 0,3, 0,1 e 0,03, com linhas verticais marcando o ponto em que o early stopping parou cada uma, perto de 40, 120 e 450 rodadas">
+  <a class="zoom" href="img/xgb_taxa_aprendizado.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/xgb_taxa_aprendizado.png" width="1050" height="600" loading="lazy" decoding="async" alt="Curvas de log-loss do XGBoost por rodada para taxas de aprendizado 0,3, 0,1 e 0,03, com linhas verticais marcando o ponto em que o early stopping parou cada uma, perto de 40, 120 e 450 rodadas"></a>
   <figcaption>Figura 4. XGBoost com três taxas de aprendizado. Taxas menores descem mais devagar e param mais tarde (tracejado = treino, contínuo = validação, pontilhado = ponto de parada).</figcaption>
 </figure>
 <details class="deep">
@@ -454,7 +522,7 @@
 <p><strong>Quando faz sentido:</strong> dados tabulares em que se quer o máximo de acerto e há tempo para ajustar hiperparâmetros. É o modelo que mais vence competições com esse tipo de dado<sup><a href="#ref-2">[2]</a></sup>, mas, como veremos, a vantagem pode ser pequena.</p>
 
 <h2 id="comparacao">Os três lado a lado</h2>
-<div class="table-wrap">
+<div class="table-wrap" role="region" tabindex="0" aria-label="Tabela (role para o lado para ver todas as colunas)">
 <table class="wide">
   <thead><tr><th></th><th class="tree-c">Árvore de Decisão</th><th class="forest-c">Random Forest</th><th class="boost-c">XGBoost</th></tr></thead>
   <tbody>
@@ -476,7 +544,7 @@
 <p>O <strong>RIPE Atlas</strong><sup><a href="#ref-7">[7]</a></sup> é uma rede de sondas mantida pelo RIPE NCC que mede a internet e publica os resultados. Entre os servidores mais estáveis dessa rede (as <strong>Anchors</strong>), há pings automáticos a cada 240 segundos, com 3 pacotes por vez. No projeto integrador<sup><a href="#ref-14">[14]</a></sup>, o grupo baixou 14 dias dessas medições para 92 <strong>fluxos</strong> (um fluxo é o par sonda de origem → servidor de destino), com RTT normal de 1 ms a 315 ms.</p>
 <p>A primeira semana serviu só para aprender o <strong>normal de cada fluxo</strong>: a mediana do RTT e o quanto ele costuma variar (o MAD, a mediana dos desvios absolutos<sup><a href="#ref-15">[15]</a></sup>). A segunda semana, de 13/09/2026 04:32 a 20/09/2026 04:32 UTC, foi rotulada pela regra do projeto, que olha o desvio em relação a esse normal, a perda de pacotes e a repetição dos desvios. É essa segunda semana que usamos aqui.</p>
 <p>Cada linha é uma medição de um fluxo. Os modelos recebem 8 <strong>atributos</strong>, todos relativos ao normal do próprio fluxo:</p>
-<div class="table-wrap">
+<div class="table-wrap" role="region" tabindex="0" aria-label="Tabela (role para o lado para ver todas as colunas)">
 <table class="wide">
   <thead><tr><th>Atributo</th><th>O que mede</th></tr></thead>
   <tbody>
@@ -491,7 +559,7 @@
 <p class="note">Tabela 2. Os 8 atributos. O RTT em milissegundos, o país e o destino ficam de fora de propósito: com eles, um modelo aprenderia que "caminho longo = problema", que é justamente o erro que o projeto quer evitar.</p>
 <p>O <strong>alvo</strong> é a classe do mesmo fluxo <strong>3 medições depois</strong> (3 × 240 s = 12 minutos). Só aceitamos o par quando a medição futura está mesmo a 11 a 13 minutos de distância e no mesmo bloco de tempo da medição de agora. Sobraram 227.112 pares. Antes de salvar qualquer arquivo, trocamos cada fluxo por um código (<code>F01</code> a <code>F92</code>) e removemos os endereços IP: nada que identifique um servidor é publicado.</p>
 <figure>
-  <img src="img/distribuicao_classes.png" alt="Barras horizontais com a porcentagem de OK, RISCO e FALHA no treino, na validação e no teste; OK fica entre 78% e 83%, RISCO entre 6% e 8% e FALHA entre 11% e 14%">
+  <a class="zoom" href="img/distribuicao_classes.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/distribuicao_classes.png" width="1050" height="510" loading="lazy" decoding="async" alt="Barras horizontais com a porcentagem de OK, RISCO e FALHA no treino, na validação e no teste; OK fica entre 78% e 83%, RISCO entre 6% e 8% e FALHA entre 11% e 14%"></a>
   <figcaption>Figura 5. Distribuição da classe daqui a 12 minutos em cada bloco. A rede passa a maior parte do tempo no próprio normal.</figcaption>
 </figure>
 <p>A classe muda em 12 minutos em apenas 13,5% das medições. É por isso que a persistência é uma régua difícil de bater: ela acerta sempre que nada muda e erra <strong>toda</strong> mudança. O que um preditor pode acrescentar está nessas mudanças, em especial nos <strong>inícios de FALHA</strong>: medições em que o caminho ainda não está em FALHA, mas vai estar daqui a 12 minutos. São 1.990 no teste.</p>
@@ -540,12 +608,12 @@ f1_macro = f1_score(y_teste, modelo.predict(X_teste), average="macro")   # o tes
 <h3>O que acontece quando a árvore cresce</h3>
 <p>Aqui o overfitting aparece claramente. O F1 macro de validação chega ao máximo, 0,711, com profundidade 3 ou 4, e depois cai. Sem limite, a árvore chega a 60 níveis, acerta 0,998 no treino e só 0,618 na validação: decorou o passado. Repare também na linha tracejada. Nenhuma profundidade passa da persistência na validação, o primeiro sinal de que a margem para um modelo é pequena.</p>
 <figure>
-  <img src="img/overfitting_profundidade.png" alt="Curvas de F1 macro no treino e na validação em função da profundidade da árvore. O treino sobe até 0,998; a validação atinge 0,711 na profundidade 3 ou 4 e cai até 0,618, sempre abaixo ou na altura da linha da persistência em 0,713">
+  <a class="zoom" href="img/overfitting_profundidade.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/overfitting_profundidade.png" width="1050" height="600" loading="lazy" decoding="async" alt="Curvas de F1 macro no treino e na validação em função da profundidade da árvore. O treino sobe até 0,998; a validação atinge 0,711 na profundidade 3 ou 4 e cai até 0,618, sempre abaixo ou na altura da linha da persistência em 0,713"></a>
   <figcaption>Figura 6. F1 macro no treino e na validação conforme a profundidade da árvore. A linha tracejada é a persistência na validação.</figcaption>
 </figure>
 
 <h2 id="resultados">Resultados no teste</h2>
-<div class="table-wrap">
+<div class="table-wrap" role="region" tabindex="0" aria-label="Tabela (role para o lado para ver todas as colunas)">
 <table>
   <thead><tr><th>Modelo</th><th>F1 macro</th><th>Recall FALHA</th><th>Precisão FALHA</th><th>Recall RISCO</th><th>Início de FALHA</th><th>FALHA perdidas</th><th>Alarmes falsos de FALHA</th></tr></thead>
   <tbody>
@@ -558,7 +626,7 @@ f1_macro = f1_score(y_teste, modelo.predict(X_teste), average="macro")   # o tes
 </div>
 <p class="note">Tabela 3. Métricas no teste (66.702 medições; 9.566 FALHA e 5.067 RISCO daqui a 12 minutos). Em destaque, o melhor valor de cada coluna. Início de FALHA: a árvore e o XGBoost anunciaram 4 dos 1.990 inícios, a Random Forest 3.</p>
 
-<div class="table-wrap">
+<div class="table-wrap" role="region" tabindex="0" aria-label="Tabela (role para o lado para ver todas as colunas)">
 <table>
   <thead><tr><th>Modelo</th><th>Treino (s)</th><th>Predição em lote, 66.702 medições (s)</th><th>Latência por medição (ms)</th></tr></thead>
   <tbody>
@@ -577,17 +645,19 @@ f1_macro = f1_score(y_teste, modelo.predict(X_teste), average="macro")   # o tes
   <li><strong>O ganho dos modelos está no fim das falhas, não no começo.</strong> A persistência diz FALHA sempre que o caminho está em FALHA agora, e erra quando a falha acaba: são 2.008 alarmes falsos. Os modelos aprenderam a reconhecer falhas que vão passar (um pico com jitter alto e sem repetição) e cortaram esses alarmes para 446 a 650. Em troca, perdem mais falhas que continuam (2.763 a 2.903, contra 1.990) e reconhecem menos RISCO.</li>
 </ul>
 <figure>
-  <img src="img/matrizes_confusao.png" alt="Quatro matrizes de confusão. Árvore: dos casos FALHA, 6803 previstos como FALHA e 2713 como OK; 513 OK previstos como FALHA. Random Forest: 6678 FALHA certos, 2835 previstos como OK, 347 OK como FALHA. XGBoost: 6663, 2841 e 345. Persistência: 7576 FALHA certos, 1764 previstos como OK, 1691 OK previstos como FALHA">
+  <div class="fig-scroll" tabindex="0" role="region" aria-label="Figura larga, role para o lado"><a class="zoom" href="img/matrizes_confusao.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/matrizes_confusao.png" width="2700" height="660" loading="lazy" decoding="async" alt="Quatro matrizes de confusão. Árvore: dos casos FALHA, 6803 previstos como FALHA e 2713 como OK; 513 OK previstos como FALHA. Random Forest: 6678 FALHA certos, 2835 previstos como OK, 347 OK como FALHA. XGBoost: 6663, 2841 e 345. Persistência: 7576 FALHA certos, 1764 previstos como OK, 1691 OK previstos como FALHA"></a></div>
+  <p class="fig-hint">Deslize para o lado para ver a figura inteira, ou toque nela para ampliar.</p>
   <figcaption>Figura 7. Matrizes de confusão no teste. Linhas: classe verdadeira daqui a 12 minutos; colunas: classe prevista.</figcaption>
 </figure>
 <figure>
-  <img src="img/metricas_teste.png" alt="Barras de F1 macro, recall de FALHA, precisão de FALHA, recall de RISCO e recall de início de FALHA para os três modelos e a persistência; o recall de início de FALHA fica perto de zero para todos">
+  <div class="fig-scroll" tabindex="0" role="region" aria-label="Figura larga, role para o lado"><a class="zoom" href="img/metricas_teste.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/metricas_teste.png" width="1500" height="630" loading="lazy" decoding="async" alt="Barras de F1 macro, recall de FALHA, precisão de FALHA, recall de RISCO e recall de início de FALHA para os três modelos e a persistência; o recall de início de FALHA fica perto de zero para todos"></a></div>
+  <p class="fig-hint">Deslize para o lado para ver a figura inteira, ou toque nela para ampliar.</p>
   <figcaption>Figura 8. Métricas no teste. As barras de início de FALHA quase não aparecem: ficam perto de zero para todos.</figcaption>
 </figure>
 
 <h3 id="geografia">Os modelos aprenderam geografia?</h3>
 <p>Separamos os fluxos em três grupos pelo RTT normal: <strong>curtos</strong> (1 a 42 ms, 31 fluxos), <strong>regionais</strong> (43 a 107 ms, 30) e <strong>longos</strong> (108 a 315 ms, 31). Esse grupo nunca entrou nos modelos; serve só para analisar os erros.</p>
-<div class="table-wrap">
+<div class="table-wrap" role="region" tabindex="0" aria-label="Tabela (role para o lado para ver todas as colunas)">
 <table>
   <thead><tr><th>Tipo de caminho</th><th>Árvore de Decisão</th><th>Random Forest</th><th>XGBoost</th><th>Persistência</th><th>Nº no teste</th></tr></thead>
   <tbody>
@@ -600,14 +670,15 @@ f1_macro = f1_score(y_teste, modelo.predict(X_teste), average="macro")   # o tes
 <p class="note">Tabela 5. F1 macro no teste por tipo de caminho.</p>
 <p>Os caminhos longos são os <strong>mais fáceis</strong> para todos, inclusive para a persistência: eles são estáveis em relação ao próprio normal. Os curtos são os mais difíceis, porque variações de frações de milissegundo já parecem desvios grandes. Nenhum modelo trata caminho longo como problema, o que confirma que os atributos relativos funcionaram. Mas, dentro de cada grupo, os modelos ficam empatados com a persistência ou abaixo dela: o pequeno ganho geral vem da mistura dos grupos, e não de uma vantagem clara em algum deles.</p>
 <figure>
-  <img src="img/f1_por_escopo.png" alt="Barras de F1 macro por tipo de caminho. Curto: modelos perto de 0,53 a 0,54 e persistência 0,575. Regional: modelos perto de 0,62 a 0,63 e persistência 0,677. Longo: todos perto de 0,85">
+  <a class="zoom" href="img/f1_por_escopo.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/f1_por_escopo.png" width="1200" height="600" loading="lazy" decoding="async" alt="Barras de F1 macro por tipo de caminho. Curto: modelos perto de 0,53 a 0,54 e persistência 0,575. Regional: modelos perto de 0,62 a 0,63 e persistência 0,677. Longo: todos perto de 0,85"></a>
   <figcaption>Figura 9. F1 macro por tipo de caminho.</figcaption>
 </figure>
 
 <h3 id="interpretabilidade">Dá para auditar?</h3>
 <p>A melhor árvore tem <strong>profundidade 4 e 16 folhas</strong>, pequena o bastante para caber numa página e ser lida inteira (está em <a href="https://github.com/iedahirari/artigo-preditor-redes/blob/main/resultados/arvore_escolhida.txt"><code>resultados/arvore_escolhida.txt</code></a>). Cada previsão tem uma <strong>explicação exata</strong>: no máximo 4 perguntas do tipo "<code>z_robusto</code> ≤ 3,41?". Random Forest e XGBoost não oferecem isso, já que cada decisão é a votação ou a soma de centenas de árvores. O que eles mostram é a <strong>importância global</strong> de cada atributo; para explicar uma previsão específica seria preciso uma ferramenta extra, como o SHAP<sup><a href="#ref-10">[10]</a></sup>.</p>
 <figure>
-  <img src="img/importancia_atributos.png" alt="Importância dos atributos em cada modelo. Árvore: z_robusto cerca de 0,52, n5_risco 0,39, jitter_relativo 0,09. Random Forest: z_robusto 0,43, n5_risco 0,25, aumento_pct 0,20. XGBoost: n5_risco 0,42, z_robusto 0,26, aumento_pct 0,12">
+  <div class="fig-scroll" tabindex="0" role="region" aria-label="Figura larga, role para o lado"><a class="zoom" href="img/importancia_atributos.png" target="_blank" rel="noopener" aria-label="Abrir a figura em tamanho original (nova aba)"><img src="img/importancia_atributos.png" width="2250" height="630" loading="lazy" decoding="async" alt="Importância dos atributos em cada modelo. Árvore: z_robusto cerca de 0,52, n5_risco 0,39, jitter_relativo 0,09. Random Forest: z_robusto 0,43, n5_risco 0,25, aumento_pct 0,20. XGBoost: n5_risco 0,42, z_robusto 0,26, aumento_pct 0,12"></a></div>
+  <p class="fig-hint">Deslize para o lado para ver a figura inteira, ou toque nela para ampliar.</p>
   <figcaption>Figura 10. Importância dos atributos em cada modelo.</figcaption>
 </figure>
 <p>As importâncias fazem sentido para quem trabalha com redes. Os três modelos se apoiam em <code>z_robusto</code> (o quanto o RTT está longe do normal agora) e em <code>n5_risco</code> (se os desvios estão se repetindo). A árvore usa praticamente só esses dois e o <code>jitter_relativo</code>; os ensembles distribuem um pouco do peso para <code>aumento_pct</code>. A perda de pacotes quase não pesa: com 3 pacotes por medição, ela é rara e, quando aparece, costuma durar pouco.</p>
@@ -671,7 +742,7 @@ jupyter notebook</code></pre>
 
 <h2 id="observacao">Quadro de observação</h2>
 <p>Como pedido na atividade, observamos duas referências da lista sugerida antes de escrever, e registramos as decisões que tomamos a partir delas.</p>
-<div class="table-wrap">
+<div class="table-wrap" role="region" tabindex="0" aria-label="Tabela (role para o lado para ver todas as colunas)">
 <table class="wide">
   <thead><tr><th>Referência observada</th><th>O que funciona nela</th><th>O que levamos para o nosso artigo</th></tr></thead>
   <tbody>
@@ -719,33 +790,64 @@ jupyter notebook</code></pre>
 </ol>
 
 <h2 id="autores">Autores</h2>
-<!-- AUTORES: um cartão por integrante. Publicar só o que cada um autorizou (LGPD). Sem telefone, e-mail pessoal ou endereço. -->
-<!-- Falta: mini-bio (curso, semestre, área de interesse) e LinkedIn de cada integrante. Publicar só o que cada um autorizou (LGPD). -->
+<!-- Ícones usados nos cartões (definidos uma vez, usados com <use href="#i-...">). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-github" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></symbol>
+  <symbol id="i-linkedin" viewBox="0 0 24 24"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></symbol>
+</svg>
+<!--
+  AUTORES: um cartão por integrante, em ordem alfabética. Publicar só o que cada um autorizou (LGPD).
+  Nada de telefone, e-mail pessoal ou endereço.
+  Para completar o cartão de alguém:
+    - Foto: salvar em img/autores/<usuario-github>.jpg (quadrada). Sem foto, aparecem as iniciais.
+    - Mini-bio: trocar o comentário <!- - bio - -> por <p class="bio">Curso · semestre · área de interesse</p>.
+    - LinkedIn: trocar o comentário <!- - linkedin - -> pelo link com o ícone, igual ao cartão da Ieda.
+-->
 <div class="authors">
   <div class="author">
-    <span class="author-photo" aria-hidden="true">AS<img onerror="this.remove()" src="img/autores/apollomoura.jpg" alt=""></span>
+    <span class="author-photo" aria-hidden="true">AS<img onerror="this.remove()" src="img/autores/apollomoura.jpg" width="64" height="64" loading="lazy" decoding="async" alt=""></span>
     <b>Apollo Moura De Sousa</b>
-    <a href="https://github.com/apollomoura">@apollomoura</a>
+    <!-- bio: pendente -->
+    <div class="author-links">
+      <a class="icon-link" href="https://github.com/apollomoura" aria-label="GitHub de Apollo Moura De Sousa" title="GitHub: @apollomoura"><svg aria-hidden="true"><use href="#i-github"/></svg></a>
+      <a class="icon-link" href="https://www.linkedin.com/in/apollo-moura-215306320/" aria-label="LinkedIn de Apollo Moura De Sousa" title="LinkedIn"><svg aria-hidden="true"><use href="#i-linkedin"/></svg></a>
+    </div>
   </div>
   <div class="author">
-    <span class="author-photo" aria-hidden="true">IS<img onerror="this.remove()" src="img/autores/clicaro.jpg" alt=""></span>
+    <span class="author-photo" aria-hidden="true">IS<img onerror="this.remove()" src="img/autores/clicaro.jpg" width="64" height="64" loading="lazy" decoding="async" alt=""></span>
     <b>Icaro Luiz Dellalo Silva</b>
-    <a href="https://github.com/clicaro">@clicaro</a>
+    <!-- bio: pendente -->
+    <div class="author-links">
+      <a class="icon-link" href="https://github.com/clicaro" aria-label="GitHub de Icaro Luiz Dellalo Silva" title="GitHub: @clicaro"><svg aria-hidden="true"><use href="#i-github"/></svg></a>
+      <!-- linkedin: pendente -->
+    </div>
   </div>
   <div class="author">
-    <span class="author-photo" aria-hidden="true">IO<img onerror="this.remove()" src="img/autores/iedahirari.jpg" alt=""></span>
+    <span class="author-photo" aria-hidden="true">IO<img onerror="this.remove()" src="img/autores/iedahirari.jpg" width="64" height="64" loading="lazy" decoding="async" alt=""></span>
     <b>Ieda de Oliveira</b>
-    <a href="https://github.com/iedahirari">@iedahirari</a>
+    <!-- bio: pendente -->
+    <div class="author-links">
+      <a class="icon-link" href="https://github.com/iedahirari" aria-label="GitHub de Ieda de Oliveira" title="GitHub: @iedahirari"><svg aria-hidden="true"><use href="#i-github"/></svg></a>
+      <a class="icon-link" href="https://www.linkedin.com/in/ieda-oliveira/" aria-label="LinkedIn de Ieda de Oliveira" title="LinkedIn"><svg aria-hidden="true"><use href="#i-linkedin"/></svg></a>
+    </div>
   </div>
   <div class="author">
-    <span class="author-photo" aria-hidden="true">JM<img onerror="this.remove()" src="img/autores/zorahsai.jpg" alt=""></span>
+    <span class="author-photo" aria-hidden="true">JM<img onerror="this.remove()" src="img/autores/zorahsai.jpg" width="64" height="64" loading="lazy" decoding="async" alt=""></span>
     <b>João Pedro C. de Morais</b>
-    <a href="https://github.com/ZorahSai">@ZorahSai</a>
+    <!-- bio: pendente -->
+    <div class="author-links">
+      <a class="icon-link" href="https://github.com/ZorahSai" aria-label="GitHub de João Pedro C. de Morais" title="GitHub: @ZorahSai"><svg aria-hidden="true"><use href="#i-github"/></svg></a>
+      <!-- linkedin: pendente -->
+    </div>
   </div>
   <div class="author">
-    <span class="author-photo" aria-hidden="true">LG<img onerror="this.remove()" src="img/autores/superlucas2000.jpg" alt=""></span>
+    <span class="author-photo" aria-hidden="true">LG<img onerror="this.remove()" src="img/autores/superlucas2000.jpg" width="64" height="64" loading="lazy" decoding="async" alt=""></span>
     <b>Lucas Matteus Baptista de Godoy</b>
-    <a href="https://github.com/SuperLucas2000">@SuperLucas2000</a>
+    <!-- bio: pendente -->
+    <div class="author-links">
+      <a class="icon-link" href="https://github.com/SuperLucas2000" aria-label="GitHub de Lucas Matteus Baptista de Godoy" title="GitHub: @SuperLucas2000"><svg aria-hidden="true"><use href="#i-github"/></svg></a>
+      <!-- linkedin: pendente -->
+    </div>
   </div>
 </div>
 
@@ -753,6 +855,7 @@ jupyter notebook</code></pre>
   <p>Texto e figuras sob licença <a href="https://creativecommons.org/licenses/by/4.0/deed.pt-br">CC BY 4.0</a>; código sob licença MIT. As figuras foram geradas pelos autores a partir dos notebooks. Dados: <a href="https://atlas.ripe.net/">RIPE Atlas</a> (RIPE NCC), usados para pesquisa conforme os termos de serviço<sup><a href="#ref-4">[4]</a></sup>.</p>
   <p>Contato e correções: <a href="https://github.com/iedahirari/artigo-preditor-redes/issues">abra uma issue no repositório</a>. Código: <a href="https://github.com/iedahirari/artigo-preditor-redes">github.com/iedahirari/artigo-preditor-redes</a>.</p>
   <p>Última revisão: <time datetime="2026-10-18">18 de outubro de 2026</time>.</p>
+  <p><a class="topo" href="#">Voltar ao topo ↑</a></p>
 </footer>
 
 </main>
