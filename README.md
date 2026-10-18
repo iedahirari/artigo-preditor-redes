@@ -68,7 +68,7 @@ Os três modelos ficam pouco acima da persistência e nenhum antecipa o início 
 - Icaro Luiz Dellalo Silva ([@clicaro](https://github.com/clicaro))
 - Ieda de Oliveira ([@iedahirari](https://github.com/iedahirari) · [LinkedIn](https://www.linkedin.com/in/ieda-oliveira/))
 - João Pedro C. de Morais ([@ZorahSai](https://github.com/ZorahSai))
-- Lucas Matteus Baptista de Godoy ([@SuperLucas2000](https://github.com/SuperLucas2000))
+- Lucas Matteus Baptista de Godoy ([@SuperLucas2000](https://github.com/SuperLucas2000) · [LinkedIn](https://www.linkedin.com/in/lucasmatteus/))
 
 ## Referências e créditos
 
