@@ -686,7 +686,7 @@ f1_macro = f1_score(y_teste, modelo.predict(X_teste), average="macro")   # o tes
 <h2 id="literatura">O que outros trabalhos encontraram</h2>
 <p>A professora Andréa Ono Sakai publicou um exemplo do mesmo tipo de problema<sup><a href="#ref-8">[8]</a></sup>, também com pings do RIPE Atlas, mas com outra regra de rótulo (percentis do próprio fluxo) e outro horizonte: a <strong>próxima</strong> medição, cerca de 4 minutos à frente. Lá, uma Random Forest com 21 atributos, incluindo janelas de 3, 6 e 12 medições, chegou a F1 macro de 0,755 no teste, contra 0,711 da persistência, e anunciou 14,6% dos inícios de FALHA (66 de 452).</p>
 <p>A comparação ajuda a ler o nosso resultado. Com atributos de janela mais longa e um horizonte mais curto, um modelo consegue algum ganho sobre a persistência nos inícios de falha. Com os nossos 8 atributos e 12 minutos de antecedência, esse ganho desaparece. O próprio RFC do nosso projeto prevê isso: <em>"sem ganho sobre a persistência, a entrega declara o sistema como detector"</em>.</p>
-<p>Em estudos de detecção de intrusão, a escolha entre Random Forest e XGBoost também varia com os dados e o ajuste, sem um vencedor universal<sup><a href="#ref-9">[9]</a></sup><sup><a href="#ref-11">[11]</a></sup>. Em outro artigo do grupo, com o NSL-KDD<sup><a href="#ref-16">[16]</a></sup>, a árvore teve o maior recall. Aqui os três empataram. A lição se repete: <strong>o vencedor depende do problema, dos atributos e da régua de comparação</strong>.</p>
+<p>Em estudos de detecção de intrusão, a escolha entre Random Forest e XGBoost também varia com os dados e o ajuste, sem um vencedor universal<sup><a href="#ref-9">[9]</a></sup><sup><a href="#ref-11">[11]</a></sup>. Aqui os três empataram. A lição se repete: <strong>o vencedor depende do problema, dos atributos e da régua de comparação</strong>.</p>
 
 <h2 id="recomendacao">Recomendação</h2>
 <div class="callout">
@@ -785,9 +785,7 @@ jupyter notebook</code></pre>
   <li id="ref-12">Van Otten, N. (2023). Gradient Boosting Explained &amp; How To Tutorials In Python With XGBoost. Spot Intelligence. <a href="https://spotintelligence.com/2023/08/18/gradient-boosting-explained-how-to-tutorials-in-python-with-xgboost/">spotintelligence.com</a></li>
   <li id="ref-13">DZone. A Deep Dive into XGBoost With Code and Explanation. <a href="https://dzone.com/articles/xgboost-deep-dive">dzone.com</a></li>
   <li id="ref-14">Grupo WebAgriculture (2026). Projeto integrador: preditor de degradação de rede com RTT normalizado. <a href="https://github.com/ZorahSai/Projeto-WebAgriculture-">github.com/ZorahSai/Projeto-WebAgriculture-</a></li>
-  <li id="ref-15">Leys, C.; Ley, C.; Klein, O.; Bernard, P.; Licata, L. (2013). Detecting outliers: Do not use standard deviation around the mean, use absolute deviation around the median. <em>Journal of Experimental Social Psychology</em>, 49(4), 764–766.</li>
-  <li id="ref-16">Grupo WebAgriculture (2026). Árvore, floresta ou boosting? Escolhendo um detector de intrusão no NSL-KDD. <a href="https://iedahirari.github.io/Artigo/">iedahirari.github.io/Artigo</a></li>
-</ol>
+  <li id="ref-15">Leys, C.; Ley, C.; Klein, O.; Bernard, P.; Licata, L. (2013). Detecting outliers: Do not use standard deviation around the mean, use absolute deviation around the median. <em>Journal of Experimental Social Psychology</em>, 49(4), 764–766.</li></ol>
 
 <h2 id="autores">Autores</h2>
 <!-- Ícones usados nos cartões (definidos uma vez, usados com <use href="#i-...">). -->
