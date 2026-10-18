@@ -65,9 +65,9 @@ Os três modelos ficam pouco acima da persistência e nenhum antecipa o início 
 ## Autores
 
 - Apollo Moura De Sousa ([@apollomoura](https://github.com/apollomoura) · [LinkedIn](https://www.linkedin.com/in/apollo-moura-215306320/))
-- Icaro Luiz Dellalo Silva ([@clicaro](https://github.com/clicaro))
+- Icaro Luiz Dellalo Silva ([@clicaro](https://github.com/clicaro) · [LinkedIn](https://www.linkedin.com/in/icaro-dellalo/))
 - Ieda de Oliveira ([@iedahirari](https://github.com/iedahirari) · [LinkedIn](https://www.linkedin.com/in/ieda-oliveira/))
-- João Pedro C. de Morais ([@ZorahSai](https://github.com/ZorahSai))
+- João Pedro C. de Morais ([@ZorahSai](https://github.com/ZorahSai) · [LinkedIn](https://www.linkedin.com/in/jo%C3%A3o-pedro-06724430b/))
 - Lucas Matteus Baptista de Godoy ([@SuperLucas2000](https://github.com/SuperLucas2000) · [LinkedIn](https://www.linkedin.com/in/lucasmatteus/))
 
 ## Referências e créditos
